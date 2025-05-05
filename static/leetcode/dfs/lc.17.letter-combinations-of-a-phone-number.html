@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>电话号码字母组合 - 递归树可视化</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    /* Custom styles */
+    body {
+      font-family: 'Inter', sans-serif; /* Use Inter font */
+      overscroll-behavior: none; /* Prevent page scroll */
+    }
+    .controls button, .controls input[type="text"] {
+      transition: all 0.3s ease; /* Smooth transition effect */
+    }
+    .controls button:hover {
+      transform: translateY(-2px); /* Slight upward movement on hover */
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Add shadow */
+    }
+    /* Node and Link base styles */
+    .node circle {
+      stroke: #999;
+      stroke-width: 1px;
+      fill: #fff; /* Default node fill */
+      transition: fill 0.3s ease, stroke 0.3s ease, r 0.3s ease; /* Node color and size transition */
+    }
+    .node text {
+      font-size: 10px;
+      fill: #333; /* Text color */
+      text-anchor: middle; /* Center text */
+      pointer-events: none; /* Text doesn't interfere with mouse events */
+    }
+    .link {
+      fill: none;
+      stroke: #ccc; /* Link color */
+      stroke-width: 1.5px;
+      transition: stroke 0.3s ease, stroke-width 0.3s ease; /* Link color transition */
+    }
+
+    /* Highlighting styles */
+    .active-node circle { /* Node being called/processed */
+      fill: #60a5fa; /* Blue fill */
+      stroke: #2563eb; /* Darker blue stroke */
+      stroke-width: 2px;
+      r: 18; /* Slightly larger radius */
+    }
+    .return-node circle { /* Node returning */
+      fill: #fcd34d; /* Yellow fill */
+      stroke: #f59e0b; /* Darker yellow stroke */
+      stroke-width: 2px;
+      r: 18; /* Slightly larger radius */
+    }
+    .result-node circle { /* Node where a result is found */
+      fill: #4ade80; /* Green fill */
+      stroke: #16a34a; /* Darker green stroke */
+      stroke-width: 2px;
+      r: 18; /* Slightly larger radius */
+    }
+    /* Style for nodes in the current active path */
+    .active-path-node circle {
+      stroke: #60a5fa; /* Blue stroke for path nodes */
+      stroke-width: 1.5px;
+    }
+    .active-link { /* Link in the current active path */
+      stroke: #60a5fa; /* Blue link color */
+      stroke-width: 2.5px;
+    }
+    /* Style for the specific link being traversed during call/return */
+    .traversing-link {
+      stroke: #ef4444; /* Red color for emphasis */
+      stroke-width: 3px;
+    }
+    /* Style for level labels */
+    .level-label {
+      font-size: 11px;
+      fill: #555;
+      text-anchor: start; /* Align text to the start (left) */
+    }
+
+    .status-box {
+      min-height: 50px; /* Minimum height for status box */
+    }
+    .result-box {
+      min-height: 50px; /* Minimum height for result box */
+      word-break: break-all; /* Wrap long words */
+    }
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .controls div {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .controls button, .controls input, .controls label {
+        margin-bottom: 0.5rem;
+      }
+      svg {
+        /* Slightly reduce SVG height on small screens */
+        height: 400px;
+      }
+      .level-label {
+        font-size: 10px; /* Smaller font on mobile */
+      }
+    }
+    /* Loader style */
+    .loader {
+      border: 4px solid #f3f3f3; /* Light grey */
+      border-top: 4px solid #3498db; /* Blue */
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-4 md:p-8 flex flex-col items-center min-h-screen">
+
+<h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 text-center">电话号码字母组合 - 递归树可视化 (LeetCode 17)</h1>
+
+<div class="controls bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-4xl">
+  <div class="flex flex-wrap items-center justify-center gap-3 md:gap-4">
+    <div class="flex items-center gap-2">
+      <label for="digitsInput" class="text-sm font-medium text-gray-700 whitespace-nowrap">输入数字 (2-9):</label>
+      <input type="text" id="digitsInput" value="23" pattern="[2-9]*" placeholder="例如: 23"
+             class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-24">
+    </div>
+    <button id="startButton" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-1.5 rounded-md text-sm shadow">开始/重置</button>
+    <button id="playPauseButton" class="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-1.5 rounded-md text-sm shadow" disabled>播放</button>
+    <button id="stepBackButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-1.5 rounded-md text-sm shadow" disabled>后退</button>
+    <button id="stepForwardButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-1.5 rounded-md text-sm shadow" disabled>前进</button>
+    <div class="flex items-center gap-2">
+      <label for="speedControl" class="text-sm font-medium text-gray-700 whitespace-nowrap">速度:</label>
+      <input type="range" id="speedControl" min="100" max="2000" value="500" step="100" class="w-24 cursor-pointer" disabled>
+      <span id="speedValue" class="text-sm text-gray-600 w-10 text-right">500ms</span>
+    </div>
+  </div>
+  <div id="messageBox" class="mt-3 text-center text-red-600 text-sm font-medium"></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl mb-6">
+  <div class="bg-white p-4 rounded-lg shadow-md status-box">
+    <h2 class="text-lg font-semibold text-gray-700 mb-2">当前状态</h2>
+    <div id="statusDisplay" class="text-sm text-gray-600">请点击 "开始"</div>
+  </div>
+  <div class="bg-white p-4 rounded-lg shadow-md result-box">
+    <h2 class="text-lg font-semibold text-gray-700 mb-2">最终结果</h2>
+    <div id="resultDisplay" class="text-sm text-gray-600">[]</div>
+  </div>
+</div>
+
+<div class="bg-white p-1 rounded-lg shadow-md w-full max-w-4xl flex-grow flex justify-center items-center overflow-auto">
+  <div id="loader" class="loader hidden"></div> <svg id="treeSvg" width="100%" height="500" class="hidden"></svg> </div>
+
+<script>
+  // --- Global Variables ---
+  const digitMap = {
+    '2': "abc", '3': "def", '4': "ghi", '5': "jkl",
+    '6': "mno", '7': "pqrs", '8': "tuv", '9': "wxyz"
+  };
+  let steps = []; // Stores each step state of the recursion
+  let treeData = null; // Hierarchical data structure for D3
+  let nodeLayout = new Map(); // Stores calculated layout (x, y, depth) for each node ID
+  let linkLayout = new Map(); // Stores layout for each link ID
+  let levelY = new Map(); // Stores average Y coordinate for each depth level
+  let currentStep = 0;
+  let intervalId = null; // Timer ID for auto-play
+  let isPlaying = false;
+  let playbackSpeed = 500; // Default playback speed (ms)
+  let nodeCounter = 0; // For generating unique node IDs
+  let currentDigits = ""; // Store the input digits globally for level label display
+
+  // --- DOM Element References ---
+  const digitsInput = document.getElementById('digitsInput');
+  const startButton = document.getElementById('startButton');
+  const playPauseButton = document.getElementById('playPauseButton');
+  const stepBackButton = document.getElementById('stepBackButton');
+  const stepForwardButton = document.getElementById('stepForwardButton');
+  const speedControl = document.getElementById('speedControl');
+  const speedValue = document.getElementById('speedValue');
+  const statusDisplay = document.getElementById('statusDisplay');
+  const resultDisplay = document.getElementById('resultDisplay');
+  const svgElement = d3.select("#treeSvg");
+  const messageBox = document.getElementById('messageBox');
+  const loader = document.getElementById('loader');
+  let svgWidth, svgHeight; // Will be set later
+
+  // --- Core Recursive Logic & Step Recording ---
+  function generateSteps(digits) {
+    currentDigits = digits; // Store digits for later use
+    steps = []; // Clear previous steps
+    treeData = { name: "start", id: `node-${nodeCounter++}`, children: [], callInfo: "处理: " + (digits || "空") }; // Root node
+    const finalResult = [];
+    let currentPathNodeIds = []; // Track node IDs in the current recursion path
+
+    // --- Inner recursive function (backtrack) ---
+    function backtrack(index, currentCombination, parentNodeData) {
+      // 1. Record Function Call Step
+      const callNodeId = `node-${nodeCounter++}`;
+      const currentDigit = index < digits.length ? digits[index] : null; // Get digit for this level
+      const letters = currentDigit ? (digitMap[currentDigit] || "") : ""; // Get letters for this level
+
+      const callStep = {
+        type: 'call',
+        index: index, // Corresponds to depth
+        currentCombination: currentCombination,
+        nodeId: callNodeId,
+        parentNodeId: parentNodeData.id,
+        message: `调用 backtrack(idx=${index}, current='${currentCombination}')`,
+        path: [...currentPathNodeIds, callNodeId],
+        results: [...finalResult],
+        digit: currentDigit, // Store digit info
+        letters: letters      // Store letter info
+      };
+      steps.push(callStep);
+      currentPathNodeIds.push(callNodeId);
+
+      // Create node data for layout calculation
+      const newNodeData = {
+        name: `idx:${index}\n'${currentCombination}'`,
+        id: callNodeId,
+        children: [],
+        callInfo: callStep.message,
+        depth: index // Store depth in node data
+      };
+      if (!parentNodeData.children) parentNodeData.children = [];
+      parentNodeData.children.push(newNodeData);
+
+      // 2. Base Case: End of digits
+      if (index === digits.length) {
+        if (currentCombination.length > 0) {
+          finalResult.push(currentCombination);
+          // Record Result Found Step
+          const resultStep = {
+            type: 'result',
+            index: index,
+            currentCombination: currentCombination,
+            nodeId: callNodeId,
+            parentNodeId: parentNodeData.id,
+            message: `找到组合: '${currentCombination}'`,
+            path: [...currentPathNodeIds],
+            results: [...finalResult]
+            // No digit/letters needed for result step display usually
+          };
+          steps.push(resultStep);
+          newNodeData.name += `\n(结果)`;
+        }
+        // Record Return Step (from base case)
+        const returnStep = {
+          type: 'return',
+          index: index,
+          currentCombination: currentCombination,
+          nodeId: callNodeId,
+          parentNodeId: parentNodeData.id,
+          message: `返回自 backtrack(idx=${index}, current='${currentCombination}')`,
+          path: currentPathNodeIds.slice(0, -1),
+          results: [...finalResult]
+        };
+        steps.push(returnStep);
+        currentPathNodeIds.pop();
+        return;
+      }
+
+      // 3. Recursive Step
+      if (letters === "") { // Handle invalid or skipped digits
+        backtrack(index + 1, currentCombination, newNodeData);
+      } else {
+        for (let i = 0; i < letters.length; i++) {
+          const letter = letters[i];
+          // Record "Trying Letter" Step
+          const tryLetterStep = {
+            type: 'try_letter',
+            index: index,
+            currentCombination: currentCombination,
+            letter: letter,
+            nodeId: callNodeId,
+            parentNodeId: parentNodeData.id,
+            message: `尝试字母 '${letter}' (来自数字 ${currentDigit})`,
+            path: [...currentPathNodeIds],
+            results: [...finalResult],
+            digit: currentDigit,
+            letters: letters
+          };
+          steps.push(tryLetterStep);
+
+          // Recursive call
+          backtrack(index + 1, currentCombination + letter, newNodeData);
+        }
+      }
+
+      // Record Return Step (after loop/skip)
+      const returnStep = {
+        type: 'return',
+        index: index,
+        currentCombination: currentCombination,
+        nodeId: callNodeId,
+        parentNodeId: parentNodeData.id,
+        message: `完成循环/返回自 backtrack(idx=${index}, current='${currentCombination}')`,
+        path: currentPathNodeIds.slice(0, -1),
+        results: [...finalResult]
+      };
+      steps.push(returnStep);
+      currentPathNodeIds.pop();
+    }
+    // --- End of backtrack function ---
+
+    // Handle empty input case
+    if (!digits || digits.length === 0) {
+      treeData.depth = 0; // Add depth to root data
+      steps.push({
+        type: 'result', index: 0, currentCombination: "",
+        nodeId: treeData.id, parentNodeId: null,
+        message: '输入为空，结果为空列表', path: [treeData.id], results: []
+      });
+    } else {
+      treeData.depth = -1; // Root is conceptually before depth 0
+      backtrack(0, "", treeData); // Start recursion
+    }
+
+    // Add final "end" step
+    steps.push({ type: 'end', index: -1, nodeId: null, parentNodeId: null, message: '递归结束', path: [], results: [...finalResult] });
+    return finalResult;
+  }
+
+  // --- D3.js Layout Calculation ---
+  function calculateLayout() {
+    nodeLayout.clear();
+    linkLayout.clear();
+    levelY.clear(); // Clear level Y coordinates
+    if (!treeData) return;
+
+    svgWidth = Math.max(600, svgElement.node().getBoundingClientRect().width);
+    svgHeight = Math.max(500, svgElement.node().getBoundingClientRect().height); // Ensure min height
+    svgElement.attr("width", svgWidth).attr("height", svgHeight);
+
+    const margin = { top: 60, right: 50, bottom: 60, left: 80 }; // Increased left margin for labels
+    const width = svgWidth - margin.left - margin.right;
+    const height = svgHeight - margin.top - margin.bottom;
+
+    const treeLayout = d3.tree().size([width, height]);
+    const root = d3.hierarchy(treeData, d => d.children); // Use children accessor
+    treeLayout(root);
+
+    const yCoordsByDepth = new Map(); // Temp map to calculate average Y
+
+    root.each(d => {
+      const x = d.x + margin.left;
+      const y = d.y + margin.top;
+      const depth = d.data.depth; // Get depth from node data
+      nodeLayout.set(d.data.id, { x: x, y: y, depth: depth, data: d.data });
+
+      // Collect Y coordinates for averaging
+      if (depth !== undefined && depth >= 0) {
+        if (!yCoordsByDepth.has(depth)) {
+          yCoordsByDepth.set(depth, []);
+        }
+        yCoordsByDepth.get(depth).push(y);
+      }
+    });
+
+    // Calculate average Y for each level
+    yCoordsByDepth.forEach((yCoords, depth) => {
+      levelY.set(depth, d3.mean(yCoords));
+    });
+
+    // Store link layout
+    root.links().forEach(link => {
+      const sourcePos = nodeLayout.get(link.source.data.id);
+      const targetPos = nodeLayout.get(link.target.data.id);
+      const linkId = `link-${link.source.data.id}-to-${link.target.data.id}`;
+      if (sourcePos && targetPos) {
+        linkLayout.set(linkId, {
+          id: linkId,
+          source: { x: sourcePos.x, y: sourcePos.y, id: link.source.data.id },
+          target: { x: targetPos.x, y: targetPos.y, id: link.target.data.id }
+        });
+      }
+    });
+  }
+
+
+  // --- Update Visualization (Called on each step change) ---
+  function updateVisualization() {
+    if (steps.length === 0 || currentStep < 0 || currentStep >= steps.length) return;
+
+    const currentStepData = steps[currentStep];
+
+    // --- 1. Update Status Display ---
+    // (Same as before)
+    let statusHtml = `
+                <p><strong>步骤:</strong> ${currentStep + 1} / ${steps.length}</p>
+                <p><strong>类型:</strong> ${currentStepData.type}</p>
+                <p><strong>信息:</strong> ${currentStepData.message}</p>
+            `;
+    if (['call', 'return', 'try_letter', 'result'].includes(currentStepData.type)) {
+      statusHtml += `<p><strong>深度 (Index):</strong> ${currentStepData.index}</p>`;
+      statusHtml += `<p><strong>当前组合:</strong> '${currentStepData.currentCombination || ""}'</p>`;
+    }
+    if (currentStepData.type === 'try_letter') {
+      statusHtml += `<p><strong>尝试字母:</strong> '${currentStepData.letter}'</p>`;
+    }
+    statusDisplay.innerHTML = statusHtml;
+
+
+    // --- 2. Update Result Display ---
+    resultDisplay.textContent = JSON.stringify(currentStepData.results || []);
+
+    // --- 3. Determine Visible Nodes, Links, and Max Depth ---
+    const visibleNodeIds = new Set();
+    const visibleLinkIds = new Set();
+    let maxVisibleDepth = -1;
+
+    for (let i = 0; i <= currentStep; i++) {
+      const step = steps[i];
+      let nodeDepth = -1;
+      if (step.nodeId) {
+        const nodeInfo = nodeLayout.get(step.nodeId);
+        if (nodeInfo) {
+          nodeDepth = nodeInfo.depth;
+        }
+      }
+
+      if (step.type === 'call' || (step.type === 'result' && step.parentNodeId === null)) { // Nodes appear on call or if it's the root result
+        if(step.nodeId) {
+          visibleNodeIds.add(step.nodeId);
+          if(nodeDepth !== undefined && nodeDepth > maxVisibleDepth) {
+            maxVisibleDepth = nodeDepth;
+          }
+        }
+        // Add the link leading to this node
+        if (step.parentNodeId) {
+          const linkId = `link-${step.parentNodeId}-to-${step.nodeId}`;
+          if (linkLayout.has(linkId)) {
+            visibleLinkIds.add(linkId);
+          }
+        }
+      } else if (step.type === 'result' && step.parentNodeId !== null) {
+        // Ensure result nodes are also counted for depth calculation
+        if(nodeDepth !== undefined && nodeDepth > maxVisibleDepth) {
+          maxVisibleDepth = nodeDepth;
+        }
+      }
+    }
+
+    // --- 4. Update D3 Tree Drawing ---
+    svgElement.selectAll("*").remove(); // Clear previous drawing
+    const g = svgElement.append("g"); // Main group
+
+    const visibleNodesData = Array.from(visibleNodeIds).map(id => nodeLayout.get(id)).filter(Boolean);
+    const visibleLinksData = Array.from(visibleLinkIds).map(id => linkLayout.get(id)).filter(Boolean);
+
+    // Draw Links
+    const linkGenerator = d3.linkVertical().x(d => d.x).y(d => d.y);
+    g.selectAll(".link")
+            .data(visibleLinksData, d => d.id)
+            .enter()
+            .append("path")
+            .attr("class", "link")
+            .attr("id", d => d.id)
+            .attr("d", d => linkGenerator({ source: d.source, target: d.target }))
+            .classed("active-link", d => {
+              const path = currentStepData.path || [];
+              const sourceIndex = path.indexOf(d.source.id);
+              return sourceIndex > -1 && path[sourceIndex + 1] === d.target.id;
+            })
+            .classed("traversing-link", d => {
+              return (currentStepData.type === 'call' && d.target.id === currentStepData.nodeId) ||
+                      (currentStepData.type === 'return' && d.target.id === currentStepData.nodeId);
+            });
+
+    // Draw Nodes
+    const nodeGroups = g.selectAll(".node")
+            .data(visibleNodesData, d => d.data.id)
+            .enter()
+            .append("g")
+            .attr("class", "node")
+            .attr("id", d => d.data.id)
+            .attr("transform", d => `translate(${d.x},${d.y})`);
+
+    nodeGroups.append("circle").attr("r", 15);
+    nodeGroups.append("text")
+            .attr("dy", "0.31em")
+            .selectAll("tspan")
+            .data(d => d.data.name.split("\n"))
+            .join("tspan")
+            .attr("x", 0)
+            .attr("dy", (d, i) => i === 0 ? 0 : "1.2em")
+            .text(d => d);
+
+    // Apply highlighting classes
+    nodeGroups.each(function(d) {
+      const nodeElement = d3.select(this);
+      const nodeId = d.data.id;
+      nodeElement.classed("active-node", false).classed("return-node", false)
+              .classed("result-node", false).classed("active-path-node", false);
+      if (currentStepData.path && currentStepData.path.includes(nodeId)) {
+        nodeElement.classed("active-path-node", true);
+      }
+      if (nodeId === currentStepData.nodeId) {
+        if (currentStepData.type === 'call' || currentStepData.type === 'try_letter') nodeElement.classed("active-node", true);
+        else if (currentStepData.type === 'return') nodeElement.classed("return-node", true);
+        else if (currentStepData.type === 'result') nodeElement.classed("result-node", true);
+      }
+    });
+
+    // --- 5. Draw Level Labels ---
+    const levelLabelData = [];
+    for (let depth = 0; depth <= maxVisibleDepth; depth++) {
+      const y = levelY.get(depth);
+      const digit = depth < currentDigits.length ? currentDigits[depth] : '?';
+      const letters = digitMap[digit] || "";
+      if (y !== undefined) { // Only add label if Y coordinate exists
+        levelLabelData.push({
+          depth: depth,
+          y: y,
+          text: `层 ${depth}: 数字 ${digit} (${letters})`
+        });
+      }
+    }
+
+    g.selectAll(".level-label")
+            .data(levelLabelData, d => d.depth) // Use depth as key
+            .enter()
+            .append("text")
+            .attr("class", "level-label")
+            .attr("x", 15) // Position from the left edge
+            .attr("y", d => d.y) // Position vertically based on average level Y
+            .attr("dy", "0.31em") // Vertical alignment
+            .text(d => d.text);
+  }
+
+
+  // --- Control Logic ---
+  function handleStart() {
+    pausePlayback();
+    loader.classList.remove('hidden');
+    svgElement.classed('hidden', true);
+    messageBox.textContent = "";
+    steps = []; treeData = null; nodeLayout.clear(); linkLayout.clear(); levelY.clear();
+    currentStep = 0; nodeCounter = 0; currentDigits = "";
+    statusDisplay.textContent = "正在生成步骤...";
+    resultDisplay.textContent = "[]";
+    svgElement.selectAll("*").remove();
+    disableControls();
+
+    setTimeout(() => {
+      const digits = digitsInput.value.trim();
+      currentDigits = digits; // Store globally
+      if (!/^[2-9]*$/.test(digits)) {
+        messageBox.textContent = "输入无效，请只输入 2-9 之间的数字。";
+        loader.classList.add('hidden');
+        enableControls(false); startButton.disabled = false; return;
+      }
+      if (digits.length > 5) {
+        messageBox.textContent = "输入数字过长 (建议 <= 5)，可能导致卡顿或树过大。";
+      }
+
+      try {
+        generateSteps(digits);
+        if (steps.length > 0 && treeData) {
+          calculateLayout();
+          currentStep = 0;
+          updateVisualization();
+          enableControls(true);
+          messageBox.textContent = ""; // Clear previous messages
+        } else {
+          messageBox.textContent = "无法生成步骤或布局。";
+          enableControls(false); startButton.disabled = false;
+        }
+      } catch (error) {
+        console.error("生成或绘制时出错:", error);
+        messageBox.textContent = `发生错误: ${error.message}`;
+        enableControls(false); startButton.disabled = false;
+      } finally {
+        loader.classList.add('hidden');
+        if (steps.length > 0) svgElement.classed('hidden', false);
+      }
+    }, 50);
+  }
+
+  function handlePlayPause() {
+    if (isPlaying) {
+      pausePlayback();
+    } else {
+      startPlayback();
+    }
+  }
+
+  function startPlayback() {
+    if (intervalId || currentStep >= steps.length - 1) return;
+    isPlaying = true;
+    playPauseButton.textContent = "暂停";
+    playPauseButton.classList.replace('bg-green-500', 'bg-red-500');
+    playPauseButton.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+
+    intervalId = setInterval(() => {
+      if (currentStep < steps.length - 1) {
+        // Directly advance step without pausing
+        currentStep++;
+        updateVisualization();
+      } else {
+        pausePlayback(); // Auto-pause at the end
+      }
+    }, playbackSpeed);
+  }
+
+  function pausePlayback() {
+    clearInterval(intervalId);
+    intervalId = null;
+    isPlaying = false;
+    playPauseButton.textContent = "播放";
+    playPauseButton.classList.replace('bg-red-500','bg-green-500');
+    playPauseButton.classList.replace('hover:bg-red-600','hover:bg-green-600');
+  }
+
+  function handleStepForward() {
+    // Pause playback IF it was playing when the button was clicked
+    if (isPlaying) pausePlayback();
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      updateVisualization();
+    }
+  }
+
+  function handleStepBackward() {
+    // Pause playback IF it was playing when the button was clicked
+    if (isPlaying) pausePlayback();
+    if (currentStep > 0) {
+      currentStep--;
+      updateVisualization();
+    }
+  }
+
+  function handleSpeedChange(event) {
+    playbackSpeed = parseInt(event.target.value, 10);
+    speedValue.textContent = `${playbackSpeed}ms`;
+    if (isPlaying) {
+      // Restart playback with the new speed
+      pausePlayback();
+      startPlayback();
+    }
+  }
+
+  function disableControls() {
+    playPauseButton.disabled = true;
+    stepBackButton.disabled = true;
+    stepForwardButton.disabled = true;
+    speedControl.disabled = true;
+    startButton.disabled = true;
+  }
+
+  function enableControls(enableAll = true) {
+    startButton.disabled = false;
+    if (enableAll && steps.length > 0) {
+      playPauseButton.disabled = false;
+      stepBackButton.disabled = false;
+      stepForwardButton.disabled = false;
+      speedControl.disabled = false;
+    } else {
+      playPauseButton.disabled = true;
+      stepBackButton.disabled = true;
+      stepForwardButton.disabled = true;
+      speedControl.disabled = true;
+      if (isPlaying) pausePlayback();
+      else {
+        playPauseButton.textContent = "播放";
+        playPauseButton.classList.replace('bg-red-500','bg-green-500');
+        playPauseButton.classList.replace('hover:bg-red-600','hover:bg-green-600');
+      }
+    }
+  }
+
+  // --- Window Resize Handling ---
+  function handleResize() {
+    if (steps.length > 0 && treeData) {
+      const wasPlaying = isPlaying;
+      if (wasPlaying) pausePlayback();
+      calculateLayout(); // Recalculate layout
+      updateVisualization(); // Redraw
+      // if (wasPlaying) startPlayback(); // Optional: resume playback
+    }
+  }
+
+  // --- Event Listeners ---
+  startButton.addEventListener('click', handleStart);
+  playPauseButton.addEventListener('click', handlePlayPause);
+  stepForwardButton.addEventListener('click', handleStepForward);
+  stepBackButton.addEventListener('click', handleStepBackward);
+  speedControl.addEventListener('input', handleSpeedChange);
+
+  // Debounced resize handler
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(handleResize, 250);
+  });
+
+  // --- Initialization ---
+  disableControls();
+  startButton.disabled = false;
+
+</script>
+
+</body>
+</html>
