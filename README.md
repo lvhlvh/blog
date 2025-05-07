@@ -1,6 +1,7 @@
 # blog
 
 ## leetcode
+* [leetcode cheatsheet](https://lvhlvh.github.io/blog/static/leetcode/leetcode-cheatsheet.html)
 * [Gemini DP刷题](https://lvhlvh.github.io/blog/static/leetcode/gemini-dp-guide.html)
 * [Gemini DP CheatSheet](https://lvhlvh.github.io/blog/static/leetcode/gemini_dp_cheatsheet.html)
 
