@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互式二叉树遍历</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Align to top to make space for more content */
+            min-height: 100vh;
+            background-color: #1a202c; /* 深色背景 */
+            color: #e2e8f0; /* 浅色文本 */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .tree-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1; /* 允许容器增长 */
+            min-height: 350px; /* 树显示的最小高度 */
+        }
+        .node {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-color: #4a5568; /* 节点背景 */
+            color: #e2e8f0; /* 节点文本 */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            border: 2px solid #2d3748; /* 节点边框 */
+            transition: background-color 0.3s, border-color 0.3s, transform 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 2; /* 确保节点在线条之上 */
+        }
+        .node.current {
+            background-color: #f6ad55; /* 当前节点高亮 (橙色) */
+            border-color: #dd6b20;
+            transform: scale(1.1);
+        }
+        .node.visited-in-path {
+            background-color: #63b3ed; /* 当前路径中的已访问节点 (蓝色) */
+            border-color: #3182ce;
+        }
+        .node.fully-visited {
+            background-color: #718096; /* 完全访问过的节点 (更深的灰色) */
+            border-color: #4a5568;
+        }
+        .line {
+            position: absolute;
+            background-color: #718096; /* 线条颜色 */
+            height: 2px;
+            transform-origin: 0 0;
+            z-index: 1; /* 线条在节点之后 */
+            transition: background-color 0.3s;
+        }
+        .line.path-line {
+            background-color: #63b3ed; /* 当前路径中的线条 */
+        }
+        .current-indicator {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: #9ae6b4; /* 浅绿色 */
+            border-radius: 50%;
+            z-index: 3; /* 指示器在节点之上 */
+            display: none; /* 默认隐藏 */
+            transition: left 0.2s, top 0.2s, background-color 0.3s; /* 平滑移动 */
+            box-shadow: 0 0 8px rgba(154, 230, 180, 0.7);
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap; /* 允许按钮在小屏幕上换行 */
+            justify-content: center;
+        }
+        .control-button {
+            padding: 10px 20px;
+            background-color: #4299e1; /* 按钮背景 (蓝色) */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .control-button:hover {
+            background-color: #3182ce;
+        }
+        .control-button:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+        .path-display-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #2d3748; /* 路径显示背景 */
+            border-radius: 8px;
+            min-height: 60px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .path-display-label {
+            font-size: 1.1em;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #a0aec0; /* 标签颜色 */
+        }
+        .path-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #f6ad55; /* 路径文本颜色 (橙色) */
+            word-wrap: break-word; /* 确保长路径换行 */
+        }
+
+        /* 代码查看器样式 */
+        .code-viewer-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 25px;
+            background-color: #2d3748;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .code-viewer-container details {
+            border-radius: 8px;
+        }
+        .code-viewer-container summary {
+            padding: 12px 15px;
+            font-weight: 500;
+            cursor: pointer;
+            background-color: #374151; /* Slightly lighter than container for header */
+            border-radius: 8px 8px 0 0; /* Rounded top corners */
+            color: #cbd5e0;
+            list-style-position: inside; /* Puts the arrow inside */
+        }
+        .code-viewer-container summary:hover {
+            background-color: #4b5563;
+        }
+        .code-viewer-container details[open] summary {
+            border-bottom: 1px solid #4a5568;
+        }
+        .code-viewer-container pre {
+            background-color: #1f2937; /* Darker background for code */
+            color: #d1d5db; /* Light gray for code text */
+            padding: 1em;
+            border-radius: 0 0 8px 8px; /* Rounded bottom corners if details is open */
+            overflow-x: auto;
+            margin: 0; /* Reset pre margin */
+            font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace; /* Common monospaced fonts */
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        .code-viewer-container code {
+            font-family: inherit; /* Inherit font from pre */
+        }
+        .code-viewer-container code .keyword { color: #569cd6; font-weight: bold; }
+        .code-viewer-container code .type { color: #4ec9b0; }
+        .code-viewer-container code .comment { color: #6a9955; font-style: italic; } /* Italicized comments */
+        .code-viewer-container code .string { color: #ce9178; }
+        .code-viewer-container code .number { color: #b5cea8; }
+
+
+        /* 响应式调整 */
+        @media (max-width: 640px) {
+            .node {
+                width: 35px;
+                height: 35px;
+                font-size: 0.9em;
+            }
+            .tree-container {
+                min-height: 300px;
+            }
+            .current-indicator {
+                width: 12px;
+                height: 12px;
+            }
+            .control-button {
+                padding: 8px 15px;
+                font-size: 14px;
+            }
+            .path-display {
+                font-size: 1.2em;
+            }
+            .code-viewer-container pre {
+                font-size: 0.85em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <button id="startButton" class="control-button">开始遍历 (Start Traversal)</button>
+    <button id="nextButton" class="control-button" disabled>下一步 (Next Step)</button>
+    <button id="resetButton" class="control-button" disabled>重置 (Reset)</button>
+</div>
+
+<div class="tree-container" id="treeContainer">
+    <div id="currentIndicator" class="current-indicator"></div>
+</div>
+
+<div class="path-display-container">
+    <div class="path-display-label">当前路径 (Current Path):</div>
+    <div class="path-display" id="currentPathDisplay">[ ]</div>
+</div>
+
+<div class="code-viewer-container">
+    <details>
+        <summary>查看/隐藏 Java 遍历逻辑代码 (View/Hide Java Traversal Logic Code)</summary>
+        <pre><code id="traversalLogicCode" class="language-java"></code></pre>
+    </details>
+</div>
+
+<script>
+    // 基于图像的树结构 (JavaScript侧仍然使用此结构进行可视化)
+    const treeData = {
+        value: 5,
+        id: 'node-5',
+        children: [
+            {
+                value: 11,
+                id: 'node-11',
+                children: [
+                    { value: 4, id: 'node-4', children: [] },
+                    { value: 8, id: 'node-8', children: [] }
+                ]
+            },
+            {
+                value: 3,
+                id: 'node-3',
+                children: [
+                    {
+                        value: 9,
+                        id: 'node-9',
+                        children: [
+                            { value: 6, id: 'node-6', children: [] },
+                            {
+                                value: 15,
+                                id: 'node-15',
+                                children: [
+                                    { value: 2, id: 'node-2', children: [] }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        value: 12,
+                        id: 'node-12',
+                        children: [
+                            { value: 7, id: 'node-7', children: [] }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    const treeContainer = document.getElementById('treeContainer');
+    const currentPathDisplay = document.getElementById('currentPathDisplay');
+    const startButton = document.getElementById('startButton');
+    const nextButton = document.getElementById('nextButton');
+    const resetButton = document.getElementById('resetButton');
+    const currentIndicator = document.getElementById('currentIndicator');
+    const traversalLogicCodeElement = document.getElementById('traversalLogicCode');
+
+    let currentPathInternal = [];
+    let traversalSteps = [];
+    let currentStepIndex = 0;
+    let nodeElementsCache = null;
+
+    // JavaScript 版本的遍历步骤生成函数 (用于驱动可视化)
+    function generateTraversalStepsJS(node, path) {
+        if (!node) return;
+        const newPath = [...path, node.value];
+        traversalSteps.push({ type: 'visit', nodeId: node.id, path: newPath });
+        const children = node.children || [];
+        for (let i = 0; i < children.length; i++) {
+            generateTraversalStepsJS(children[i], newPath);
+        }
+        traversalSteps.push({ type: 'leave', nodeId: node.id, path: path });
+    }
+
+    // --- 其他 JavaScript 函数 (calculateNodePositions, drawTree, updateVisuals, findNodeByValueInTreeData, startTraversal, nextStep, resetTraversal) ---
+    // 计算节点位置的函数
+    function calculateNodePositions(node, x, y, horizontalSpacing, verticalSpacing, level, positions) {
+        if (!node) return;
+        positions[node.id] = { x, y, level };
+        const children = node.children || [];
+        const numChildren = children.length;
+        if (numChildren === 0) return;
+        for (let i = 0; i < numChildren; i++) {
+            const childX = x + (i - (numChildren - 1) / 2) * (horizontalSpacing / Math.pow(1.8, level));
+            const childY = y + verticalSpacing;
+            calculateNodePositions(children[i], childX, childY, horizontalSpacing, verticalSpacing, level + 1, positions);
+        }
+    }
+
+    // 绘制树的函数
+    function drawTree() {
+        treeContainer.innerHTML = '';
+        treeContainer.appendChild(currentIndicator);
+
+        const positions = {};
+        const containerWidth = treeContainer.offsetWidth;
+        const initialX = containerWidth / 2;
+        const initialY = 50;
+        const horizontalSpacing = Math.min(containerWidth / 3.5, 150);
+        const verticalSpacing = 70;
+
+        calculateNodePositions(treeData, initialX, initialY, horizontalSpacing, verticalSpacing, 0, positions);
+
+        let minX = Infinity, maxX = -Infinity;
+        for (const id in positions) {
+            minX = Math.min(minX, positions[id].x);
+            maxX = Math.max(maxX, positions[id].x);
+        }
+        const treeWidth = maxX - minX;
+        const nodeSizeForOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--node-size') || '40');
+        const xOffset = (containerWidth - treeWidth) / 2 - minX + (nodeSizeForOffset / 2);
+
+
+        const newNodeElements = {};
+        function drawRecursive(node, parentPosition) {
+            if (!node) return;
+            const pos = positions[node.id];
+            const adjustedX = pos.x + xOffset;
+            const nodeSize = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--node-size') || (window.innerWidth <= 640 ? 35 : 40));
+
+
+            const nodeDiv = document.createElement('div');
+            nodeDiv.classList.add('node');
+            nodeDiv.id = node.id;
+            nodeDiv.textContent = node.value;
+            nodeDiv.style.left = `${adjustedX - nodeSize / 2}px`;
+            nodeDiv.style.top = `${pos.y - nodeSize / 2}px`;
+            treeContainer.appendChild(nodeDiv);
+            newNodeElements[node.id] = nodeDiv;
+
+            if (parentPosition) {
+                const line = document.createElement('div');
+                line.classList.add('line');
+                const parentX = parentPosition.x + xOffset;
+                const parentY = parentPosition.y;
+                const childX = adjustedX;
+                const childY = pos.y;
+                const angle = Math.atan2(childY - parentY, childX - parentX) * 180 / Math.PI;
+                const length = Math.sqrt(Math.pow(childX - parentX, 2) + Math.pow(childY - parentY, 2));
+                line.style.width = `${length}px`;
+                line.style.transform = `rotate(${angle}deg)`;
+                line.style.left = `${parentX}px`;
+                line.style.top = `${parentY}px`;
+                line.dataset.parentId = parentPosition.id;
+                line.dataset.childId = node.id;
+                treeContainer.insertBefore(line, currentIndicator);
+            }
+            const children = node.children || [];
+            children.forEach(child => drawRecursive(child, {x: adjustedX, y: pos.y, id: node.id}));
+        }
+        drawRecursive(treeData, null);
+        return newNodeElements;
+    }
+
+    // 更新视觉效果
+    function updateVisuals() {
+        if (!nodeElementsCache || Object.keys(nodeElementsCache).length === 0) {
+            currentIndicator.style.display = 'none';
+            return;
+        }
+        if (currentStepIndex < 0 || currentStepIndex >= traversalSteps.length) {
+            currentIndicator.style.display = 'none';
+            return;
+        }
+
+        const step = traversalSteps[currentStepIndex];
+        const { type, nodeId: stepNodeId, path: stepPath } = step;
+
+        Object.values(nodeElementsCache).forEach(el => {
+            el.classList.remove('current', 'visited-in-path', 'fully-visited');
+        });
+        document.querySelectorAll('.line').forEach(line => {
+            line.classList.remove('path-line');
+        });
+
+        let activeNodeForIndicatorId = null;
+        let pathForHighlighting = [];
+        let pathForTextDisplay = [];
+
+        if (type === 'visit') {
+            activeNodeForIndicatorId = stepNodeId;
+            pathForHighlighting = stepPath;
+            pathForTextDisplay = stepPath;
+            currentPathInternal = stepPath;
+        } else if (type === 'leave') {
+            pathForHighlighting = stepPath;
+            pathForTextDisplay = stepPath;
+            currentPathInternal = stepPath;
+
+            if (stepPath.length > 0) {
+                let parentData = treeData;
+                let parentFound = true;
+                for (let i = 0; i < stepPath.length; i++) {
+                    const valueToFind = stepPath[i];
+                    if (i === 0) {
+                        if (parentData.value !== valueToFind) {
+                            parentFound = false; break;
+                        }
+                    } else {
+                        const childNode = (parentData.children || []).find(c => c.value === valueToFind);
+                        if (childNode) {
+                            parentData = childNode;
+                        } else {
+                            parentFound = false; break;
+                        }
+                    }
+                }
+                if (parentFound) {
+                    activeNodeForIndicatorId = parentData.id;
+                } else {
+                    activeNodeForIndicatorId = null;
+                }
+            } else {
+                activeNodeForIndicatorId = stepNodeId;
+            }
+            if (nodeElementsCache[stepNodeId]) {
+                nodeElementsCache[stepNodeId].classList.add('fully-visited');
+                nodeElementsCache[stepNodeId].classList.remove('visited-in-path', 'current');
+            }
+        }
+
+        const pathNodeIds = new Set();
+        if (pathForHighlighting.length > 0) {
+            let tempNodeData = treeData;
+            for (let i = 0; i < pathForHighlighting.length; i++) {
+                const val = pathForHighlighting[i];
+                const nodeToFind = findNodeByValueInTreeData(tempNodeData, val, i === 0);
+                if (nodeToFind && nodeElementsCache[nodeToFind.id]) {
+                    pathNodeIds.add(nodeToFind.id);
+                    nodeElementsCache[nodeToFind.id].classList.add('visited-in-path');
+                    if (i < pathForHighlighting.length - 1) {
+                        const nextVal = pathForHighlighting[i+1];
+                        const nextNodeToFind = findNodeByValueInTreeData(nodeToFind, nextVal, false);
+                        if (nextNodeToFind) {
+                            const lineEl = document.querySelector(`.line[data-parent-id="${nodeToFind.id}"][data-child-id="${nextNodeToFind.id}"]`);
+                            if (lineEl) lineEl.classList.add('path-line');
+                        }
+                    }
+                    tempNodeData = nodeToFind;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        for(let i = 0; i < currentStepIndex; i++) {
+            const prevStep = traversalSteps[i];
+            if(prevStep.type === 'leave'){
+                const prevLeftNodeId = prevStep.nodeId;
+                if(nodeElementsCache[prevLeftNodeId]){
+                    nodeElementsCache[prevLeftNodeId].classList.add('fully-visited');
+                    if (!pathNodeIds.has(prevLeftNodeId)) {
+                        nodeElementsCache[prevLeftNodeId].classList.remove('visited-in-path');
+                    }
+                    if (activeNodeForIndicatorId !== prevLeftNodeId) {
+                        nodeElementsCache[prevLeftNodeId].classList.remove('current');
+                    }
+                }
+            }
+        }
+        if (type === 'leave' && nodeElementsCache[stepNodeId]) {
+            nodeElementsCache[stepNodeId].classList.add('fully-visited');
+            nodeElementsCache[stepNodeId].classList.remove('current');
+            if (!pathNodeIds.has(stepNodeId)) {
+                nodeElementsCache[stepNodeId].classList.remove('visited-in-path');
+            }
+        }
+        const currentStyledNodeDiv = nodeElementsCache[activeNodeForIndicatorId];
+        if (currentStyledNodeDiv) {
+            currentStyledNodeDiv.classList.add('current');
+            if (pathNodeIds.has(activeNodeForIndicatorId)) {
+                currentStyledNodeDiv.classList.add('visited-in-path');
+            }
+            currentStyledNodeDiv.classList.remove('fully-visited');
+
+            const nodeRect = currentStyledNodeDiv.getBoundingClientRect();
+            const containerRect = treeContainer.getBoundingClientRect();
+            const indicatorWidth = currentIndicator.offsetWidth || (window.innerWidth <= 640 ? 12 : 15);
+            const indicatorHeight = currentIndicator.offsetHeight || (window.innerWidth <= 640 ? 12 : 15);
+            let indicatorLeft = (nodeRect.left - containerRect.left) - indicatorWidth - 5;
+            let indicatorTop = (nodeRect.top - containerRect.top) + (nodeRect.height / 2) - (indicatorHeight / 2);
+            currentIndicator.style.left = `${indicatorLeft}px`;
+            currentIndicator.style.top = `${indicatorTop}px`;
+            currentIndicator.style.display = 'block';
+        } else {
+            if (type === 'leave' && stepPath.length === 0 && stepNodeId === treeData.id) {
+                const rootNodeDiv = nodeElementsCache[treeData.id];
+                if (rootNodeDiv) {
+                    const nodeRect = rootNodeDiv.getBoundingClientRect();
+                    const containerRect = treeContainer.getBoundingClientRect();
+                    const indicatorWidth = currentIndicator.offsetWidth || (window.innerWidth <= 640 ? 12 : 15);
+                    const indicatorHeight = currentIndicator.offsetHeight || (window.innerWidth <= 640 ? 12 : 15);
+                    let indicatorLeft = (nodeRect.left - containerRect.left) - indicatorWidth - 5;
+                    let indicatorTop = (nodeRect.top - containerRect.top) + (nodeRect.height / 2) - (indicatorHeight / 2);
+                    currentIndicator.style.left = `${indicatorLeft}px`;
+                    currentIndicator.style.top = `${indicatorTop}px`;
+                    currentIndicator.style.display = 'block';
+                } else {
+                    currentIndicator.style.display = 'none';
+                }
+            } else {
+                currentIndicator.style.display = 'none';
+            }
+        }
+
+        currentPathDisplay.textContent = `[ ${pathForTextDisplay.join(', ')} ]`;
+        nextButton.disabled = currentStepIndex >= traversalSteps.length - 1;
+        resetButton.disabled = false;
+        startButton.disabled = true;
+    }
+
+    function findNodeByValueInTreeData(startNodeData, value, isRootSearch) {
+        if (!startNodeData) return null;
+        if (isRootSearch && startNodeData.value === value) return startNodeData;
+        const children = startNodeData.children || [];
+        for (const child of children) {
+            if (child.value === value) return child;
+        }
+        return null;
+    }
+
+    function startTraversal() {
+        if (!nodeElementsCache || Object.keys(nodeElementsCache).length === 0) {
+            nodeElementsCache = drawTree();
+        }
+        traversalSteps = [];
+        currentPathInternal = [];
+        currentStepIndex = 0;
+        generateTraversalStepsJS(treeData, []); // 使用JS版本的函数驱动可视化
+        if (traversalSteps.length > 0) {
+            updateVisuals();
+            startButton.disabled = true;
+            nextButton.disabled = false;
+            resetButton.disabled = false;
+        } else {
+            startButton.disabled = false;
+            nextButton.disabled = true;
+            resetButton.disabled = true;
+            currentIndicator.style.display = 'none';
+        }
+    }
+
+    function nextStep() {
+        if (currentStepIndex < traversalSteps.length - 1) {
+            currentStepIndex++;
+            updateVisuals();
+        }
+    }
+
+    function resetTraversal() {
+        currentStepIndex = 0;
+        currentPathInternal = [];
+        traversalSteps = [];
+        currentPathDisplay.textContent = '[ ]';
+        currentIndicator.style.display = 'none';
+
+        if (nodeElementsCache) {
+            Object.values(nodeElementsCache).forEach(el => {
+                el.classList.remove('current', 'visited-in-path', 'fully-visited');
+            });
+        }
+        document.querySelectorAll('.line').forEach(line => {
+            line.classList.remove('path-line');
+        });
+
+        startButton.disabled = false;
+        nextButton.disabled = true;
+        resetButton.disabled = true;
+    }
+
+
+    // 更新后的Java代码字符串，用于显示
+    const javaTraversalCode = `
+class TreeTraversal {
+    // Assumes Node class with: int value; Node left; Node right;
+    // Assumes List is imported, e.g., java.util.List, java.util.ArrayList;
+
+    public void preOrderTraversal(Node node, List<Integer> currentPath) {
+        if (node == null) {
+            return;
+        }
+
+        currentPath.add(node.value);
+        // Process node (e.g., add to results, print for debug)
+
+        if (node.left != null) {
+            preOrderTraversal(node.left, currentPath);
+        }
+
+        if (node.right != null) {
+            preOrderTraversal(node.right, currentPath);
+        }
+
+        currentPath.remove(currentPath.size() - 1); // Backtrack
+    }
+}
+`;
+
+    // 简单的HTML转义和基本高亮函数
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function applyBasicJavaHighlighting(code) {
+        let highlightedCode = escapeHtml(code);
+        // Keywords
+        const keywords = ['public', 'class', 'void', 'if', 'return', 'new', 'null']; // Removed int, String, List, Node as they are more like types here
+        keywords.forEach(kw => {
+            const regex = new RegExp(`\\b${kw}\\b`, 'g');
+            highlightedCode = highlightedCode.replace(regex, `<span class="keyword">${kw}</span>`);
+        });
+        // Types
+        const types = ['Node', 'List', 'int']; // Simplified list of types for this context
+        types.forEach(t => {
+            const regex = new RegExp(`\\b${t}\\b`, 'g');
+            highlightedCode = highlightedCode.replace(regex, `<span class="type">${t}</span>`);
+        });
+
+        // Comments (single line starting with //)
+        highlightedCode = highlightedCode.replace(/(\/\/.*)/g, '<span class="comment">$1</span>');
+        // Strings (if any, though not in this specific snippet)
+        highlightedCode = highlightedCode.replace(/(&quot;.*?&quot;)/g, '<span class="string">$1</span>');
+        // Numbers (if any)
+        highlightedCode = highlightedCode.replace(/\b(\d+)\b/g, '<span class="number">$1</span>');
+        return highlightedCode;
+    }
+
+
+    startButton.addEventListener('click', startTraversal);
+    nextButton.addEventListener('click', nextStep);
+    resetButton.addEventListener('click', resetTraversal);
+
+    window.addEventListener('load', () => {
+        document.documentElement.style.setProperty('--node-size', window.innerWidth <= 640 ? '35px' : '40px');
+        nodeElementsCache = drawTree();
+        currentIndicator.style.display = 'none';
+
+        if (traversalLogicCodeElement) {
+            traversalLogicCodeElement.innerHTML = applyBasicJavaHighlighting(javaTraversalCode);
+        }
+
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                document.documentElement.style.setProperty('--node-size', window.innerWidth <= 640 ? '35px' : '40px');
+                nodeElementsCache = drawTree();
+                if (!startButton.disabled) {
+                    currentIndicator.style.display = 'none';
+                } else if (traversalSteps.length > 0 && currentStepIndex < traversalSteps.length) {
+                    updateVisuals();
+                } else {
+                    currentIndicator.style.display = 'none';
+                }
+            }, 250);
+        });
+    });
+</script>
+</body>
+</html>
