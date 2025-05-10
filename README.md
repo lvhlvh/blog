@@ -10,4 +10,5 @@
 * [LC.78.子集问题](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.78.subset.html)
 
 ### 二叉树展开为链表
+* [LC.105.从前序与中序遍历序列构造二叉树](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.105.construct-binary-tree-from-preorder-and-inorder-traversal.html)
 * [LC.114.二叉树展开为链表](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.114.flatten-binary-tree-to-linked-list.html)

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetCode 105: 从前序与中序遍历序列构造二叉树 - 可视化</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .array-box { display: flex; flex-wrap: wrap; margin-bottom: 10px; padding: 5px; border: 1px solid #ccc; border-radius: 8px; min-height: 40px; }
+    .array-element {
+      min-width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #ddd; margin: 2px; padding: 0 5px; border-radius: 4px;
+      font-size: 0.9em;
+      transition: all 0.3s ease-in-out;
+    }
+    .code-line { display: block; padding: 2px 5px; margin: 1px 0; border-radius: 3px; transition: background-color 0.3s ease; }
+    .highlight-code { background-color: #fefcbf; /* yellow-200 */ }
+
+    /* Pointers/Boundaries */
+    .current-scope { box-shadow: 0 0 0 2px #fbbf24; /* amber-400 */ }
+
+    /* Element types based on diagram */
+    .root-val-highlight { background-color: #38bdf8; color: white; /* sky-500 */ border-color: #0ea5e9; } /* Blue for rootVal */
+    .left-subtree-highlight { background-color: #f97316; color: white; /* orange-500 */ border-color: #ea580c; } /* Orange for left subtree */
+    .right-subtree-highlight { background-color: #10b981; color: white; /* emerald-500 */ border-color: #059669; } /* Green for right subtree */
+    .default-highlight { background-color: #e5e7eb; /* gray-200 */ }
+
+    .status-box {
+      padding: 8px; margin-top: 5px; border-radius: 5px; font-size: 0.9em;
+      border: 1px solid transparent;
+    }
+    .status-info { background-color: #eff6ff; border-color: #93c5fd; color: #1e40af; } /* blue-50, blue-300, blue-800 */
+    .status-success { background-color: #f0fdf4; border-color: #86efac; color: #15803d; } /* green-50, green-300, green-700 */
+    .status-error { background-color: #fef2f2; border-color: #fca5a5; color: #b91c1c; } /* red-50, red-300, red-900 */
+
+    #tree-visualization-svg {
+      width: 100%;
+      height: 100%;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .node circle {
+      stroke: #333;
+      stroke-width: 1.5px;
+      transition: fill 0.3s ease, stroke 0.3s ease;
+    }
+    .node text {
+      font-size: 12px;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      fill: white;
+      pointer-events: none; /* So text doesn't interfere with circle events */
+    }
+    .node .value-text { fill: black; } /* For nodes that are not root/left/right highlighted during creation */
+
+    .link {
+      fill: none;
+      stroke: #9ca3af; /* gray-400 */
+      stroke-width: 1.5px;
+      transition: stroke 0.3s ease;
+    }
+    .controls button {
+      transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+    }
+    .controls button:active {
+      transform: scale(0.95);
+    }
+    .tooltip {
+      position: absolute;
+      text-align: center;
+      padding: 6px 10px;
+      font: 12px sans-serif;
+      background: #333;
+      color: white;
+      border: 0px;
+      border-radius: 8px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 p-4 md:p-8">
+<div class="container mx-auto max-w-7xl space-y-6">
+  <header class="text-center py-6">
+    <h1 class="text-3xl md:text-4xl font-bold text-sky-700">LeetCode 105: 从前序与中序遍历序列构造二叉树</h1>
+    <p class="text-slate-600">交互式算法可视化</p>
+  </header>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="md:col-span-1 space-y-6 p-6 bg-white shadow-xl rounded-xl">
+      <section id="input-section">
+        <h2 class="text-xl font-semibold mb-3 text-sky-600">输入序列</h2>
+        <div class="space-y-3">
+          <div>
+            <label for="preorder-input" class="block text-sm font-medium text-slate-700">前序遍历 (Preorder):</label>
+            <input type="text" id="preorder-input" value="3,9,20,15,7" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+          </div>
+          <div>
+            <label for="inorder-input" class="block text-sm font-medium text-slate-700">中序遍历 (Inorder):</label>
+            <input type="text" id="inorder-input" value="9,3,15,20,7" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500">
+          </div>
+        </div>
+        <div id="input-error" class="mt-3 text-sm text-red-600"></div>
+      </section>
+
+      <section id="controls-section">
+        <h2 class="text-xl font-semibold mb-3 text-sky-600">控制</h2>
+        <div class="controls grid grid-cols-2 gap-3">
+          <button id="start-button" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-md shadow-md">开始演示</button>
+          <button id="reset-button" class="w-full bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-md shadow-md">重置</button>
+          <button id="next-step-button" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md" disabled>下一步</button>
+          <button id="auto-play-button" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-md shadow-md" disabled>自动播放</button>
+        </div>
+        <div class="mt-3">
+          <label for="speed-slider" class="block text-sm font-medium text-slate-700">播放速度:</label>
+          <input type="range" id="speed-slider" min="100" max="3000" value="1500" step="100" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500">
+          <div class="text-xs text-slate-500 text-center"><span id="speed-value">1.5</span> 秒/步</div>
+        </div>
+      </section>
+
+      <section id="explanation-section">
+        <h2 class="text-xl font-semibold mb-3 text-sky-600">算法解释</h2>
+        <div id="explanation-text" class="status-box status-info min-h-[50px] text-sm">
+          请点击 "开始演示" 来启动。
+        </div>
+      </section>
+    </div>
+
+    <div class="md:col-span-2 space-y-6">
+      <section id="array-visualization" class="p-6 bg-white shadow-xl rounded-xl">
+        <h2 class="text-xl font-semibold mb-3 text-sky-600">数组状态</h2>
+        <div>
+          <h3 class="text-md font-medium mb-1">前序遍历 (Preorder): <span id="preorder-pointers" class="text-xs text-slate-500"></span></h3>
+          <div id="preorder-display" class="array-box"></div>
+        </div>
+        <div class="mt-4">
+          <h3 class="text-md font-medium mb-1">中序遍历 (Inorder): <span id="inorder-pointers" class="text-xs text-slate-500"></span></h3>
+          <div id="inorder-display" class="array-box"></div>
+        </div>
+        <div class="mt-4">
+          <h3 class="text-md font-medium mb-1">变量状态:</h3>
+          <div id="variables-display" class="text-sm text-slate-700 space-y-1">
+            <div><code class="bg-slate-100 p-1 rounded">rootVal: N/A</code></div>
+            <div><code class="bg-slate-100 p-1 rounded">index (inorder): N/A</code></div>
+            <div><code class="bg-slate-100 p-1 rounded">leftSize: N/A</code></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section id="tree-construction-section" class="p-6 bg-white shadow-xl rounded-xl min-h-[300px] md:min-h-[400px]">
+          <h2 class="text-xl font-semibold mb-3 text-sky-600">二叉树构建</h2>
+          <div id="tree-visualization-container" class="w-full h-[250px] md:h-[350px] relative">
+            <svg id="tree-visualization-svg"></svg>
+            <div class="tooltip"></div>
+          </div>
+        </section>
+
+        <section id="code-highlighting-section" class="p-6 bg-white shadow-xl rounded-xl">
+          <h2 class="text-xl font-semibold mb-3 text-sky-600">Java 代码 (核心逻辑)</h2>
+          <pre class="text-sm bg-slate-800 text-slate-100 p-4 rounded-md overflow-x-auto"><code id="java-code-display">
+<span id="line-1" class="code-line">1  if (preStart > preEnd) {</span>
+<span id="line-2" class="code-line">2      return null;</span>
+<span id="line-3" class="code-line">3  }</span>
+<span id="line-4" class="code-line">4  int rootVal = preorder[preStart];</span>
+<span id="line-5" class="code-line">5  int index = valToIndex.get(rootVal);</span>
+<span id="line-6" class="code-line">6  int leftSize = index - inStart;</span>
+<span id="line-7" class="code-line">7  TreeNode root = new TreeNode(rootVal);</span>
+<span id="line-8" class="code-line">8  root.left = build(preorder, preStart + 1, preStart + leftSize,</span>
+<span id="line-9" class="code-line">9                    inorder, inStart, index - 1);</span>
+<span id="line-10" class="code-line">10 root.right = build(preorder, preStart + leftSize + 1, preEnd,</span>
+<span id="line-11" class="code-line">11                    inorder, index + 1, inEnd);</span>
+<span id="line-12" class="code-line">12 return root;</span>
+                        </code></pre>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // DOM Elements
+  const preorderInput = document.getElementById('preorder-input');
+  const inorderInput = document.getElementById('inorder-input');
+  const inputError = document.getElementById('input-error');
+  const startButton = document.getElementById('start-button');
+  const resetButton = document.getElementById('reset-button');
+  const nextStepButton = document.getElementById('next-step-button');
+  const autoPlayButton = document.getElementById('auto-play-button');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedValueDisplay = document.getElementById('speed-value');
+
+  const preorderDisplay = document.getElementById('preorder-display');
+  const inorderDisplay = document.getElementById('inorder-display');
+  const preorderPointersEl = document.getElementById('preorder-pointers');
+  const inorderPointersEl = document.getElementById('inorder-pointers');
+  const variablesDisplay = document.getElementById('variables-display');
+
+  const explanationText = document.getElementById('explanation-text');
+  const javaCodeDisplay = document.getElementById('java-code-display');
+  const treeSvg = d3.select("#tree-visualization-svg");
+  const tooltip = d3.select(".tooltip");
+
+  const svgElement = document.getElementById('tree-visualization-svg');
+  const svgContainer = document.getElementById('tree-visualization-container');
+
+
+  // Global State
+  let preorderArray = [];
+  let inorderArray = [];
+  let valToIndex = new Map();
+  let animationSteps = [];
+  let currentStep = -1;
+  let autoPlayIntervalId = null;
+  let isPlaying = false;
+  let animationSpeed = 1500; // ms
+
+  let nodeIdCounter = 0;
+  let treeData = { nodes: [], links: [] }; // For D3 force layout or tree layout
+  let d3TreeNodes = []; // Used by D3 simulation/layout
+  let d3TreeLinks = []; // Used by D3 simulation/layout
+
+  const NODE_RADIUS = 18;
+  const LEVEL_HEIGHT = 70;
+
+  // --- Input Parsing and Validation ---
+  function parseInput(inputStr) {
+    if (!inputStr.trim()) return [];
+    return inputStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  }
+
+  function validateInputs(pre, ino) {
+    inputError.textContent = '';
+    if (pre.length === 0 || ino.length === 0) {
+      inputError.textContent = '输入数组不能为空。';
+      return false;
+    }
+    if (pre.length !== ino.length) {
+      inputError.textContent = '前序和中序数组的长度必须相同。';
+      return false;
+    }
+    const preSet = new Set(pre);
+    const inoSet = new Set(ino);
+    if (preSet.size !== pre.length || inoSet.size !== ino.length) {
+      inputError.textContent = '数组中的元素必须唯一。';
+      return false;
+    }
+    if (preSet.size !== inoSet.size) {
+      inputError.textContent = '数组元素不匹配。';
+      return false;
+    }
+    for (let val of pre) {
+      if (!inoSet.has(val)) {
+        inputError.textContent = '数组元素不匹配。';
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // --- Algorithm Step Generation ---
+  function generateBuildStepsRecursive(currentPreArr, currentInArr, preStart, preEnd, inStart, inEnd, parentId = null, isLeft = null, level = 0, callStackDepth = 0) {
+    const currentCallId = `call-${level}-${preStart}-${inStart}`;
+
+    // Step: Base Case Check
+    animationSteps.push({
+      type: 'BASE_CASE_CHECK', preStart, preEnd, inStart, inEnd, level, parentId, isLeft, callStackDepth, currentCallId,
+      codeLine: 1, explanation: `递归调用 (层级 ${level}): 检查边界 preStart=${preStart}, preEnd=${preEnd}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, null, null, null, 'base_check', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, null, null, null, 'base_check', currentPreArr, currentInArr, true)
+    });
+
+    if (preStart > preEnd) {
+      animationSteps.push({
+        type: 'BASE_CASE_RETURN_NULL', preStart, preEnd, inStart, inEnd, level, parentId, isLeft, callStackDepth, currentCallId,
+        codeLine: 2, explanation: `preStart (${preStart}) > preEnd (${preEnd}). 返回 null. 子树为空.`,
+        preorderFullHighlights: animationSteps[animationSteps.length-1].preorderFullHighlights,
+        inorderFullHighlights: animationSteps[animationSteps.length-1].inorderFullHighlights,
+      });
+      return null;
+    }
+
+    const rootVal = currentPreArr[preStart];
+    // Step: Get rootVal from preorder
+    animationSteps.push({
+      type: 'GET_ROOT_VAL', preStart, preEnd, inStart, inEnd, rootVal, level, parentId, isLeft, callStackDepth, currentCallId,
+      codeLine: 4, explanation: `从前序数组取根节点: preorder[${preStart}] = ${rootVal}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, null, null, 'get_root', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, null, null, 'get_root', currentPreArr, currentInArr, true),
+      variables: { rootVal }
+    });
+
+    const indexInInorder = valToIndex.get(rootVal);
+    // Step: Find rootVal in inorder
+    animationSteps.push({
+      type: 'FIND_ROOT_IN_INORDER', preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, level, parentId, isLeft, callStackDepth, currentCallId,
+      codeLine: 5, explanation: `在中序数组中找到根节点 ${rootVal} 的位置: index = ${indexInInorder}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, null, 'find_inorder', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, null, 'find_inorder', currentPreArr, currentInArr, true),
+      variables: { rootVal, indexInInorder }
+    });
+
+    const leftSize = indexInInorder - inStart;
+    // Step: Calculate leftSize
+    animationSteps.push({
+      type: 'CALCULATE_LEFT_SIZE', preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, level, parentId, isLeft, callStackDepth, currentCallId,
+      codeLine: 6, explanation: `计算左子树大小: leftSize = ${indexInInorder} - ${inStart} = ${leftSize}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'calc_left_size', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'calc_left_size', currentPreArr, currentInArr, true),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+
+    const newNodeId = `node-${nodeIdCounter++}`;
+    const nodeData = { id: newNodeId, value: rootVal, level: level, parentId: parentId, isLeft: isLeft, children: [] };
+    // Step: Create TreeNode
+    animationSteps.push({
+      type: 'CREATE_NODE', preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, level, nodeData, parentId, isLeft, callStackDepth, currentCallId,
+      codeLine: 7, explanation: `创建新节点 TreeNode(${rootVal}) (ID: ${newNodeId}).`,
+      preorderFullHighlights: animationSteps[animationSteps.length-1].preorderFullHighlights,
+      inorderFullHighlights: animationSteps[animationSteps.length-1].inorderFullHighlights,
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+
+    // Recurse for Left Child
+    const leftPreStart = preStart + 1;
+    const leftPreEnd = preStart + leftSize;
+    const leftInStart = inStart;
+    const leftInEnd = indexInInorder - 1;
+    animationSteps.push({
+      type: 'RECURSE_LEFT_CALL', preStart:leftPreStart, preEnd:leftPreEnd, inStart:leftInStart, inEnd:leftInEnd, level: level + 1, parentId: newNodeId, isLeft: true, callStackDepth: callStackDepth + 1, currentCallId: `call-${level+1}-${leftPreStart}-${leftInStart}`,
+      codeLine: 8, explanation: `准备递归构建左子树 for ${rootVal}. Params: pre[${leftPreStart}..${leftPreEnd}], in[${leftInStart}..${leftInEnd}]`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_left_call', currentPreArr, currentInArr, false, {leftPreStart, leftPreEnd}),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_left_call', currentPreArr, currentInArr, true, {leftInStart, leftInEnd}),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+    const leftChild = generateBuildStepsRecursive(currentPreArr, currentInArr, leftPreStart, leftPreEnd, leftInStart, leftInEnd, newNodeId, true, level + 1, callStackDepth + 1);
+    if (leftChild) nodeData.children.push(leftChild); // For conceptual tree
+
+    animationSteps.push({
+      type: 'RECURSE_LEFT_RETURN', preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, level, parentId, isLeft, callStackDepth, currentCallId,
+      nodeId: newNodeId, childNodeId: leftChild ? leftChild.id : null, isLeftChildAttach: true,
+      codeLine: 9, explanation: `左子树构建完成 for ${rootVal}. root.left = ${leftChild ? leftChild.value : 'null'}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_left_return', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_left_return', currentPreArr, currentInArr, true),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+
+    // Recurse for Right Child
+    const rightPreStart = preStart + leftSize + 1;
+    const rightPreEnd = preEnd;
+    const rightInStart = indexInInorder + 1;
+    const rightInEnd = inEnd;
+    animationSteps.push({
+      type: 'RECURSE_RIGHT_CALL', preStart:rightPreStart, preEnd:rightPreEnd, inStart:rightInStart, inEnd:rightInEnd, level: level + 1, parentId: newNodeId, isLeft: false, callStackDepth: callStackDepth + 1, currentCallId: `call-${level+1}-${rightPreStart}-${rightInStart}`,
+      codeLine: 10, explanation: `准备递归构建右子树 for ${rootVal}. Params: pre[${rightPreStart}..${rightPreEnd}], in[${rightInStart}..${rightInEnd}]`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_right_call', currentPreArr, currentInArr, false, {rightPreStart, rightPreEnd}),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_right_call', currentPreArr, currentInArr, true, {rightInStart, rightInEnd}),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+    const rightChild = generateBuildStepsRecursive(currentPreArr, currentInArr, rightPreStart, rightPreEnd, rightInStart, rightInEnd, newNodeId, false, level + 1, callStackDepth + 1);
+    if (rightChild) nodeData.children.push(rightChild);
+
+    animationSteps.push({
+      type: 'RECURSE_RIGHT_RETURN', preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, level, parentId, isLeft, callStackDepth, currentCallId,
+      nodeId: newNodeId, childNodeId: rightChild ? rightChild.id : null, isLeftChildAttach: false,
+      codeLine: 11, explanation: `右子树构建完成 for ${rootVal}. root.right = ${rightChild ? rightChild.value : 'null'}.`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_right_return', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'recurse_right_return', currentPreArr, currentInArr, true),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+
+    // Step: Return root
+    animationSteps.push({
+      type: 'RETURN_NODE', preStart, preEnd, inStart, inEnd, rootVal, level, parentId, isLeft, callStackDepth, currentCallId,
+      nodeId: newNodeId,
+      codeLine: 12, explanation: `返回当前构建的节点 (${rootVal}) (ID: ${newNodeId}) (层级 ${level}).`,
+      preorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'return_node', currentPreArr, currentInArr),
+      inorderFullHighlights: getFullArrayHighlights(preStart, preEnd, inStart, inEnd, rootVal, indexInInorder, leftSize, 'return_node', currentPreArr, currentInArr, true),
+      variables: { rootVal, indexInInorder, leftSize }
+    });
+    return nodeData;
+  }
+
+  function getFullArrayHighlights(ps, pe, is, ie, rootVal, inorderIdx, leftSize, stepType, preArr, inArr, isForInorder = false, subRange = null) {
+    let highlights = [];
+    const arr = isForInorder ? inArr : preArr;
+    const currentPs = ps; const currentPe = pe; // Current scope of the recursive call
+    const currentIs = is; const currentIe = ie;
+
+    for (let i = 0; i < arr.length; i++) {
+      let classes = ['array-element'];
+      let inCurrentScope = false;
+
+      if (isForInorder) { // Highlighting for Inorder Array
+        if (i >= currentIs && i <= currentIe) {
+          inCurrentScope = true;
+          if (stepType !== 'base_check') {
+            if (arr[i] === rootVal && i === inorderIdx) classes.push('root-val-highlight'); // Root
+            else if (leftSize !== null && i >= currentIs && i < inorderIdx) classes.push('left-subtree-highlight'); // Left
+            else if (leftSize !== null && i > inorderIdx && i <= currentIe) classes.push('right-subtree-highlight'); // Right
+            else classes.push('default-highlight');
+          } else {
+            classes.push('default-highlight');
+          }
+        }
+        if (subRange && i >= subRange.leftInStart && i <= subRange.leftInEnd) { // specifically for left recursive call
+          if(stepType === 'recurse_left_call') classes.push('current-scope', 'left-subtree-highlight');
+        }
+        if (subRange && i >= subRange.rightInStart && i <= subRange.rightInEnd) { // specifically for right recursive call
+          if(stepType === 'recurse_right_call') classes.push('current-scope', 'right-subtree-highlight');
+        }
+
+
+      } else { // Highlighting for Preorder Array
+        if (i >= currentPs && i <= currentPe) {
+          inCurrentScope = true;
+          if (stepType !== 'base_check') {
+            if (arr[i] === rootVal && i === currentPs) classes.push('root-val-highlight'); // Root
+            else if (leftSize !== null && i > currentPs && i <= currentPs + leftSize) classes.push('left-subtree-highlight'); // Left
+            else if (leftSize !== null && i > currentPs + leftSize && i <= currentPe) classes.push('right-subtree-highlight'); // Right
+            else classes.push('default-highlight');
+          } else {
+            classes.push('default-highlight');
+          }
+        }
+        if (subRange && i >= subRange.leftPreStart && i <= subRange.leftPreEnd) { // specifically for left recursive call
+          if(stepType === 'recurse_left_call') classes.push('current-scope', 'left-subtree-highlight');
+        }
+        if (subRange && i >= subRange.rightPreStart && i <= subRange.rightPreEnd) { // specifically for right recursive call
+          if(stepType === 'recurse_right_call') classes.push('current-scope', 'right-subtree-highlight');
+        }
+      }
+      if (stepType === 'base_check' && inCurrentScope) {
+        classes.push('current-scope');
+      }
+      if (classes.length === 1) classes.push('bg-slate-100'); // Default for elements outside scope
+
+      highlights.push({ value: arr[i], classes: classes.join(' ') });
+    }
+    return highlights;
+  }
+
+
+  // --- Visualization Rendering ---
+  function displayArrays(preHighlights, inHighlights, preRange, inRange) {
+    preorderDisplay.innerHTML = preHighlights.map(h => `<span class="${h.classes}">${h.value}</span>`).join('');
+    inorderDisplay.innerHTML = inHighlights.map(h => `<span class="${h.classes}">${h.value}</span>`).join('');
+    preorderPointersEl.textContent = preRange ? `(preStart: ${preRange[0]}, preEnd: ${preRange[1]})` : '';
+    inorderPointersEl.textContent = inRange ? `(inStart: ${inRange[0]}, inEnd: ${inRange[1]})` : '';
+  }
+
+  function updateVariablesDisplay(vars) {
+    variablesDisplay.innerHTML = `
+                <div><code class="bg-slate-100 p-1 rounded">rootVal: ${vars && vars.rootVal !== undefined ? vars.rootVal : 'N/A'}</code></div>
+                <div><code class="bg-slate-100 p-1 rounded">index (inorder): ${vars && vars.indexInInorder !== undefined ? vars.indexInInorder : 'N/A'}</code></div>
+                <div><code class="bg-slate-100 p-1 rounded">leftSize: ${vars && vars.leftSize !== undefined ? vars.leftSize : 'N/A'}</code></div>
+            `;
+  }
+
+  function highlightCodeLine(lineNumber) {
+    document.querySelectorAll('#java-code-display .code-line').forEach(line => {
+      line.classList.remove('highlight-code');
+    });
+    if (lineNumber) {
+      const lineEl = document.getElementById(`line-${lineNumber}`);
+      if (lineEl) lineEl.classList.add('highlight-code');
+    }
+  }
+
+  function drawTree() {
+    treeSvg.selectAll("*").remove(); // Clear previous drawing
+    if (d3TreeNodes.length === 0) return;
+
+    const containerWidth = svgContainer.clientWidth;
+    const containerHeight = svgContainer.clientHeight;
+
+    // Create a root for D3 hierarchy if multiple roots or no root yet
+    // This requires building a proper hierarchy first
+    let rootNodeForD3;
+    if (d3TreeNodes.length > 0) {
+      const nodeMap = new Map(d3TreeNodes.map(n => [n.id, {...n, children: []}]));
+      d3TreeNodes.forEach(node => {
+        if (node.parentId && nodeMap.has(node.parentId)) {
+          const parent = nodeMap.get(node.parentId);
+          parent.children.push(nodeMap.get(node.id));
+        }
+      });
+      rootNodeForD3 = nodeMap.get(d3TreeNodes.find(n => !n.parentId)?.id || d3TreeNodes[0].id);
+      // If the root is not the actual root of the entire tree (e.g. during partial construction)
+      // we might need to find the node with level 0.
+      const actualRoot = d3TreeNodes.find(n => n.level === 0);
+      if (actualRoot) rootNodeForD3 = nodeMap.get(actualRoot.id);
+
+    } else {
+      return;
+    }
+
+    if (!rootNodeForD3) return; // Should not happen if nodes exist
+
+    const rootHierarchy = d3.hierarchy(rootNodeForD3, d => d.children);
+    const treeLayout = d3.tree().size([containerWidth - 40, containerHeight - 60]); // margins
+    treeLayout(rootHierarchy);
+
+    const g = treeSvg.append("g").attr("transform", `translate(20, 30)`); // margins
+
+    // Links
+    const links = rootHierarchy.links();
+    g.selectAll(".link")
+            .data(links)
+            .enter().append("line")
+            .attr("class", "link")
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y)
+            .style("opacity", 0)
+            .transition().duration(500)
+            .style("opacity", 1);
+
+    // Nodes
+    const nodes = rootHierarchy.descendants();
+    const nodeGroups = g.selectAll(".node")
+            .data(nodes, d => d.data.id)
+            .enter().append("g")
+            .attr("class", "node")
+            .attr("transform", d => `translate(${d.x},${d.y})`)
+            .style("opacity", 0)
+            .on("mouseover", (event, d) => {
+              tooltip.transition().duration(200).style("opacity", .9);
+              tooltip.html(`ID: ${d.data.id}<br/>Value: ${d.data.value}<br/>Level: ${d.data.level}`)
+                      .style("left", (event.pageX + 5) + "px")
+                      .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", () => {
+              tooltip.transition().duration(500).style("opacity", 0);
+            });
+
+    nodeGroups.append("circle")
+            .attr("r", NODE_RADIUS)
+            .style("fill", d => {
+              const step = animationSteps[currentStep];
+              if (step && step.nodeData && step.nodeData.id === d.data.id && step.type === 'CREATE_NODE') {
+                // Color based on which part of the array it came from (heuristic)
+                // This is a simplification; true coloring would require tracking array segment origin
+                if (d.data.isLeft === true) return '#f97316'; // orange-500
+                if (d.data.isLeft === false) return '#10b981'; // emerald-500
+                return '#38bdf8'; // sky-500 (root)
+              }
+              return "#60a5fa"; // blue-400 default
+            });
+
+    nodeGroups.append("text")
+            .attr("dy", ".35em")
+            .text(d => d.data.value)
+            .style("fill", "white");
+
+    nodeGroups.transition().duration(500).style("opacity", 1);
+  }
+
+
+  function renderStep(stepIndex) {
+    if (stepIndex < 0 || stepIndex >= animationSteps.length) return;
+    const step = animationSteps[stepIndex];
+
+    explanationText.textContent = step.explanation;
+    explanationText.className = 'status-box text-sm status-info'; // Default
+    highlightCodeLine(step.codeLine);
+
+    displayArrays(
+            step.preorderFullHighlights,
+            step.inorderFullHighlights,
+            [step.preStart, step.preEnd], // For current pre range display
+            [step.inStart, step.inEnd]    // For current in range display
+    );
+
+    updateVariablesDisplay(step.variables || {});
+
+
+    if (step.type === 'CREATE_NODE') {
+      const existingNode = d3TreeNodes.find(n => n.id === step.nodeData.id);
+      if (!existingNode) {
+        d3TreeNodes.push({...step.nodeData, children: []}); // Add children array for hierarchy
+      }
+    } else if ((step.type === 'RECURSE_LEFT_RETURN' || step.type === 'RECURSE_RIGHT_RETURN') && step.childNodeId) {
+      // Links are derived from hierarchy in drawTree, explicit link array not strictly needed if using d3.hierarchy
+    } else if (step.type === 'BASE_CASE_RETURN_NULL') {
+      explanationText.className = 'status-box text-sm status-error';
+    }
+    if (step.type === 'RETURN_NODE' && step.level === 0) { // Final root returned
+      explanationText.className = 'status-box text-sm status-success';
+    }
+
+
+    drawTree(); // Redraw tree with current nodes and links
+
+    // Update button states
+    nextStepButton.disabled = (currentStep >= animationSteps.length - 1);
+    autoPlayButton.disabled = (currentStep >= animationSteps.length - 1);
+    if (currentStep >= animationSteps.length - 1) {
+      if (isPlaying) handleAutoPlay(); // Stop autoplay
+      explanationText.textContent += " 树构建完成!";
+      explanationText.className = 'status-box text-sm status-success';
+    }
+  }
+
+  // --- Control Logic ---
+  function handleStart() {
+    preorderArray = parseInput(preorderInput.value);
+    inorderArray = parseInput(inorderInput.value);
+
+    if (!validateInputs(preorderArray, inorderArray)) {
+      return;
+    }
+
+    resetVisualizationState();
+    valToIndex.clear();
+    inorderArray.forEach((val, i) => valToIndex.set(val, i));
+
+    nodeIdCounter = 0;
+    animationSteps = [];
+    generateBuildStepsRecursive(preorderArray, inorderArray, 0, preorderArray.length - 1, 0, inorderArray.length - 1);
+
+    if (animationSteps.length > 0) {
+      currentStep = 0;
+      renderStep(currentStep);
+      nextStepButton.disabled = false;
+      autoPlayButton.disabled = false;
+      startButton.disabled = true;
+      explanationText.className = 'status-box text-sm status-info';
+    } else {
+      explanationText.textContent = "无法生成演示步骤 (可能是空数组或无效)。";
+      explanationText.className = 'status-box text-sm status-error';
+    }
+  }
+
+  function handleReset() {
+    if (isPlaying) handleAutoPlay(); // Stop autoplay
+
+    preorderInput.value = "3,9,20,15,7";
+    inorderInput.value = "9,3,15,20,7";
+    inputError.textContent = '';
+
+    resetVisualizationState();
+    explanationText.textContent = '请点击 "开始演示" 来启动。';
+    explanationText.className = 'status-box text-sm status-info';
+    startButton.disabled = false;
+    nextStepButton.disabled = true;
+    autoPlayButton.disabled = true;
+    autoPlayButton.textContent = '自动播放';
+    updateVariablesDisplay(null);
+  }
+
+  function resetVisualizationState() {
+    currentStep = -1;
+    animationSteps = [];
+    d3TreeNodes = [];
+    d3TreeLinks = [];
+    treeSvg.selectAll("*").remove();
+    preorderDisplay.innerHTML = '';
+    inorderDisplay.innerHTML = '';
+    preorderPointersEl.textContent = '';
+    inorderPointersEl.textContent = '';
+    highlightCodeLine(null);
+  }
+
+
+  function handleNextStep() {
+    if (currentStep < animationSteps.length - 1) {
+      currentStep++;
+      renderStep(currentStep);
+    }
+  }
+
+  function handleAutoPlay() {
+    if (isPlaying) {
+      clearInterval(autoPlayIntervalId);
+      isPlaying = false;
+      autoPlayButton.textContent = '自动播放';
+      autoPlayButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+      autoPlayButton.classList.add('bg-teal-500', 'hover:bg-teal-600');
+      nextStepButton.disabled = (currentStep >= animationSteps.length - 1);
+    } else {
+      isPlaying = true;
+      autoPlayButton.textContent = '暂停';
+      autoPlayButton.classList.remove('bg-teal-500', 'hover:bg-teal-600');
+      autoPlayButton.classList.add('bg-red-500', 'hover:bg-red-600');
+      nextStepButton.disabled = true;
+      autoPlayIntervalId = setInterval(() => {
+        if (currentStep < animationSteps.length - 1) {
+          handleNextStep();
+        } else {
+          handleAutoPlay(); // Stop when done
+        }
+      }, animationSpeed);
+    }
+  }
+
+  speedSlider.addEventListener('input', (e) => {
+    animationSpeed = parseInt(e.target.value);
+    speedValueDisplay.textContent = (animationSpeed / 1000).toFixed(1);
+    if (isPlaying) { // Reset interval with new speed
+      clearInterval(autoPlayIntervalId);
+      autoPlayIntervalId = setInterval(() => {
+        if (currentStep < animationSteps.length - 1) {
+          handleNextStep();
+        } else {
+          handleAutoPlay(); // Stop when done
+        }
+      }, animationSpeed);
+    }
+  });
+
+
+  // Event Listeners
+  startButton.addEventListener('click', handleStart);
+  resetButton.addEventListener('click', handleReset);
+  nextStepButton.addEventListener('click', handleNextStep);
+  autoPlayButton.addEventListener('click', handleAutoPlay);
+
+  // Initial setup
+  handleReset(); // To set default values and clear state
+  speedValueDisplay.textContent = (animationSpeed / 1000).toFixed(1);
+
+</script>
+</body>
+</html>
