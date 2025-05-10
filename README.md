@@ -4,6 +4,7 @@
 * [leetcode cheatsheet](https://lvhlvh.github.io/blog/static/leetcode/leetcode-cheatsheet.html)
 * [Gemini DP刷题](https://lvhlvh.github.io/blog/static/leetcode/gemini-dp-guide.html)
 * [Gemini DP CheatSheet](https://lvhlvh.github.io/blog/static/leetcode/gemini_dp_cheatsheet.html)
+* [二叉树递归思想](https://lvhlvh.github.io/blog/static/leetcode/gemini_binary_tree_recursion_thinking.html)
 
 ### DFS/回溯
 * [LC.17.电话号码的字母组合](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.17.letter-combinations-of-a-phone-number.html)
