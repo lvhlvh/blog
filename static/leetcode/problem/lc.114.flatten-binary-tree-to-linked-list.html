@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>二叉树展开为链表演示 (LeetCode 114)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f3f4f6; /* Tailwind gray-100 */
+      padding: 20px;
+    }
+    .container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      width: 100%;
+      max-width: 800px;
+    }
+    .tree-container { /* This is treeVisualizationWrapper */
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+      border-radius: 0.375rem;
+      min-height: 200px;
+      position: relative;
+      overflow-x: auto;
+      background-color: #ffffff;
+    }
+    #treeVisualization { /* Inner div that will get dynamic width/height */
+      position: relative;
+      width: 100%;
+      min-height: 180px;
+    }
+    .node {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #3b82f6; /* Tailwind blue-500 */
+      background-color: #eff6ff; /* Tailwind blue-50 */
+      color: #1e40af; /* Tailwind blue-800 */
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-weight: bold;
+      position: absolute;
+      transition: all 0.3s ease;
+      z-index: 1; /* Nodes on top of lines/SVG */
+    }
+    .node-value {
+      /* Text is centered by flex properties on .node */
+    }
+
+    /* Highlighting styles */
+    .current-node-highlight {
+      background-color: #fef3c7; /* Tailwind amber-100 */
+      border-color: #f59e0b; /* Tailwind amber-500 */
+      color: #b45309; /* Tailwind amber-700 */
+      transform: scale(1.1);
+    }
+    .predecessor-node-highlight {
+      background-color: #d1fae5; /* Tailwind green-100 */
+      border-color: #10b981; /* Tailwind green-500 */
+      color: #047857; /* Tailwind green-700 */
+    }
+    .path-highlight {
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.5); /* Tailwind pink-500 with opacity */
+    }
+
+    /* SVG lines will be styled directly or via JS, .line class is removed */
+
+    .message-box {
+      margin-top: 1.5rem;
+      padding: 0.75rem 1rem;
+      background-color: #e0f2fe; /* Tailwind sky-100 */
+      border: 1px solid #7dd3fc; /* Tailwind sky-300 */
+      color: #0c4a6e; /* Tailwind sky-800 */
+      border-radius: 0.375rem;
+      min-height: 50px;
+      font-size: 0.875rem; /* text-sm */
+    }
+
+    input[type="text"] {
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      width: calc(100% - 130px);
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      font-weight: 500; /* medium */
+      transition: background-color 0.2s ease;
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background-color: #3b82f6; /* Tailwind blue-500 */
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #2563eb; /* Tailwind blue-600 */
+    }
+    .btn-success {
+      background-color: #10b981; /* Tailwind green-500 */
+      color: white;
+    }
+    .btn-success:hover {
+      background-color: #059669; /* Tailwind green-600 */
+    }
+    .btn-warning {
+      background-color: #f59e0b; /* Tailwind amber-500 */
+      color: white;
+    }
+    .btn-warning:hover {
+      background-color: #d97706; /* Tailwind amber-600 */
+    }
+    .controls button:disabled {
+      background-color: #d1d5db; /* Tailwind gray-300 */
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1 class="text-2xl font-bold text-center text-gray-700 mb-6">二叉树展开为链表演示 (LeetCode 114)</h1>
+
+  <div class="controls flex items-center mb-4">
+    <input type="text" id="treeInput" class="flex-grow rounded-md shadow-sm" placeholder="例如: [1,2,5,3,4,null,6]" value="[1,2,5,3,4,null,6]">
+    <button id="loadTreeBtn" class="btn-primary">加载/重置树</button>
+  </div>
+
+  <div class="controls flex justify-center mb-4">
+    <button id="nextStepBtn" class="btn-success" disabled>下一步</button>
+    <button id="flattenAllBtn" class="btn-warning" disabled>一键展开</button>
+  </div>
+
+  <div id="treeVisualizationWrapper" class="tree-container">
+    <div id="treeVisualization">
+    </div>
+  </div>
+
+  <div id="messageArea" class="message-box">
+    请先加载树结构。
+  </div>
+</div>
+
+<script>
+  // TreeNode Definition
+  class TreeNode {
+    constructor(val) {
+      this.val = val;
+      this.left = null;
+      this.right = null;
+      this.id = TreeNode.nextId++;
+      this.x = 0;
+      this.y = 0;
+      this.domElement = null;
+    }
+  }
+  TreeNode.nextId = 0;
+
+  let treeRoot = null;
+  let originalTreeData = null;
+  let flattenIterator = null;
+  let svgLineContainer = null; // To hold the SVG element for lines
+
+  const treeInput = document.getElementById('treeInput');
+  const loadTreeBtn = document.getElementById('loadTreeBtn');
+  const nextStepBtn = document.getElementById('nextStepBtn');
+  const flattenAllBtn = document.getElementById('flattenAllBtn');
+  const treeVisualizationDiv = document.getElementById('treeVisualization');
+  const treeVisualizationWrapper = document.getElementById('treeVisualizationWrapper');
+  const messageArea = document.getElementById('messageArea');
+
+  // --- Tree Building ---
+  function buildTreeFromArray(arr) {
+    TreeNode.nextId = 0;
+    if (!arr || arr.length === 0 || arr[0] === null) return null;
+    const root = new TreeNode(arr[0]);
+    const queue = [root];
+    let i = 1;
+    while (i < arr.length) {
+      const currentParent = queue.shift();
+      if (!currentParent) continue;
+      const leftVal = arr[i++];
+      if (leftVal !== null && leftVal !== undefined) {
+        currentParent.left = new TreeNode(leftVal);
+        queue.push(currentParent.left);
+      }
+      if (i < arr.length) {
+        const rightVal = arr[i++];
+        if (rightVal !== null && rightVal !== undefined) {
+          currentParent.right = new TreeNode(rightVal);
+          queue.push(currentParent.right);
+        }
+      }
+    }
+    return root;
+  }
+
+  function parseInputString(inputStr) {
+    try {
+      const parsed = JSON.parse(inputStr.replace(/null/g, 'null'));
+      if (!Array.isArray(parsed)) return { error: "输入必须是数组格式，例如 [1,2,null,3]" };
+      return { data: parsed.map(val => (val === "null" || val === null) ? null : Number(val)) };
+    } catch (e) {
+      return { error: "输入格式无效。请使用类似 [1,2,null,3] 的格式。" };
+    }
+  }
+
+  // --- Visualization Constants ---
+  const NODE_DIAMETER = 40;
+  const LEVEL_HEIGHT = 80;
+  const HORIZONTAL_SPACING = 30;
+
+  // --- Node Position Calculation ---
+  function calculateNodePositionsRecursive(node, level = 0, xOffset = 0) {
+    if (!node) return { width: 0, positions: [], minX: xOffset, maxX: xOffset };
+    node.y = level * LEVEL_HEIGHT + NODE_DIAMETER / 2 + 10;
+    let currentX = xOffset;
+    let positions = [];
+    let subtreeMinX = xOffset;
+    let subtreeMaxX = xOffset + NODE_DIAMETER;
+
+    let leftSubtreeInfo = { width: 0, positions: [], minX: currentX, maxX: currentX };
+    if (node.left) {
+      leftSubtreeInfo = calculateNodePositionsRecursive(node.left, level + 1, currentX);
+      positions.push(...leftSubtreeInfo.positions);
+      currentX = leftSubtreeInfo.maxX + HORIZONTAL_SPACING;
+      subtreeMinX = Math.min(subtreeMinX, leftSubtreeInfo.minX);
+      subtreeMaxX = Math.max(subtreeMaxX, leftSubtreeInfo.maxX);
+    }
+
+    node.x = currentX;
+    positions.push({ node: node, x: node.x, y: node.y });
+    subtreeMinX = Math.min(subtreeMinX, node.x);
+    subtreeMaxX = Math.max(subtreeMaxX, node.x + NODE_DIAMETER);
+    currentX += NODE_DIAMETER;
+
+    let rightSubtreeInfo = { width: 0, positions: [], minX: currentX, maxX: currentX };
+    if (node.right) {
+      currentX += HORIZONTAL_SPACING;
+      rightSubtreeInfo = calculateNodePositionsRecursive(node.right, level + 1, currentX);
+      positions.push(...rightSubtreeInfo.positions);
+      subtreeMinX = Math.min(subtreeMinX, rightSubtreeInfo.minX);
+      subtreeMaxX = Math.max(subtreeMaxX, rightSubtreeInfo.maxX);
+    }
+
+    if (node.left && node.right) {
+      const leftChildPos = leftSubtreeInfo.positions.find(p => p.node === node.left);
+      const rightChildPos = rightSubtreeInfo.positions.find(p => p.node === node.right);
+      if (leftChildPos && rightChildPos) {
+        const desiredParentX = (leftChildPos.x + rightChildPos.x) / 2;
+        const shift = desiredParentX - node.x;
+        if (Math.abs(shift) > 1) {
+          node.x += shift;
+          positions.find(p => p.node === node).x = node.x;
+          if (node.right) { // Only shift right subtree if parent moved right relative to it
+            rightSubtreeInfo.positions.forEach(p => { if(p.x >= node.x + NODE_DIAMETER/2) p.x += shift});
+          }
+          // Recalculate min/max X is complex, this is a simplified adjustment
+          subtreeMinX = Math.min(...positions.map(p=>p.x));
+          subtreeMaxX = Math.max(...positions.map(p=>p.x + NODE_DIAMETER));
+        }
+      }
+    } else if (node.left && !node.right) {
+      const leftChildPos = leftSubtreeInfo.positions.find(p => p.node === node.left);
+      if (leftChildPos) node.x = leftChildPos.x + NODE_DIAMETER/2 - NODE_DIAMETER/2; // Center over left
+    } else if (!node.left && node.right) {
+      const rightChildPos = rightSubtreeInfo.positions.find(p => p.node === node.right);
+      if (rightChildPos) node.x = rightChildPos.x + NODE_DIAMETER/2 - NODE_DIAMETER/2; // Center over right
+    }
+    return { width: subtreeMaxX - subtreeMinX, positions: positions, minX: subtreeMinX, maxX: subtreeMaxX };
+  }
+
+  // --- Tree Rendering ---
+  function renderTree(root) {
+    treeVisualizationDiv.innerHTML = ''; // Clear nodes and previous SVG
+    svgLineContainer = null; // Reset SVG container
+
+    if (!root) {
+      treeVisualizationDiv.style.width = '100%';
+      treeVisualizationDiv.style.height = '180px';
+      return;
+    }
+
+    // Create SVG container for lines
+    const svgNS = "http://www.w3.org/2000/svg";
+    svgLineContainer = document.createElementNS(svgNS, "svg");
+    svgLineContainer.style.position = 'absolute';
+    svgLineContainer.style.left = '0';
+    svgLineContainer.style.top = '0';
+    svgLineContainer.style.width = '100%'; // Will match parent treeVisualizationDiv
+    svgLineContainer.style.height = '100%';
+    svgLineContainer.style.zIndex = 0; // Behind nodes
+
+    // Define arrowhead marker
+    const defs = document.createElementNS(svgNS, "defs");
+    const marker = document.createElementNS(svgNS, "marker");
+    marker.setAttribute("id", "arrowhead");
+    marker.setAttribute("viewBox", "0 0 10 7"); // Internal coordinate system of the marker
+    marker.setAttribute("markerWidth", "6");    // Displayed width of the marker
+    marker.setAttribute("markerHeight", "4.2"); // Displayed height (maintaining 10:7 aspect ratio)
+    marker.setAttribute("refX", "10");          // Tip of arrow polygon is at x=10 in its viewBox
+    marker.setAttribute("refY", "3.5");         // Middle of arrow polygon height
+    marker.setAttribute("orient", "auto");      // Rotates marker with line slope
+
+    const polygon = document.createElementNS(svgNS, "polygon");
+    polygon.setAttribute("points", "0 0, 10 3.5, 0 7"); // Triangle: base at x=0, tip at x=10, y=3.5
+    polygon.setAttribute("fill", "#4b5563"); // Arrowhead color
+
+    marker.appendChild(polygon);
+    defs.appendChild(marker);
+    svgLineContainer.appendChild(defs);
+    treeVisualizationDiv.appendChild(svgLineContainer); // Add SVG layer first
+
+    // Calculate positions
+    const { positions, minX: calculatedMinX, maxX: calculatedMaxX } = calculateNodePositionsRecursive(root, 0, 0);
+    const actualContentWidth = calculatedMaxX - calculatedMinX;
+    const PADDING = 20; // Increased padding slightly
+
+    const xShift = -calculatedMinX + PADDING;
+    positions.forEach(p => { p.node.x += xShift; });
+
+    const requiredWidth = actualContentWidth + 2 * PADDING;
+    treeVisualizationDiv.style.width = `${Math.max(requiredWidth, treeVisualizationWrapper.clientWidth - 2*PADDING)}px`; // Ensure min width of wrapper
+
+    let maxY = 0;
+    positions.forEach(({ node }) => {
+      if (node.y + NODE_DIAMETER > maxY) maxY = node.y + NODE_DIAMETER;
+
+      const nodeEl = document.createElement('div');
+      nodeEl.classList.add('node');
+      nodeEl.style.left = `${node.x}px`;
+      nodeEl.style.top = `${node.y}px`;
+      const valueSpan = document.createElement('span');
+      valueSpan.classList.add('node-value');
+      valueSpan.textContent = node.val;
+      nodeEl.appendChild(valueSpan);
+      node.domElement = nodeEl;
+      treeVisualizationDiv.appendChild(nodeEl); // Add nodes on top of SVG
+    });
+    treeVisualizationDiv.style.height = `${maxY + PADDING}px`;
+
+    // Draw lines in the SVG container
+    positions.forEach(({ node }) => {
+      if (node.left) drawLine(node, node.left, svgLineContainer);
+      if (node.right) drawLine(node, node.right, svgLineContainer);
+    });
+
+    applyHighlights();
+  }
+
+  function drawLine(parentNode, childNode, svgContainer) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const lineEl = document.createElementNS(svgNS, "line");
+
+    const x1 = parentNode.x + NODE_DIAMETER / 2;
+    const y1 = parentNode.y + NODE_DIAMETER; // Line starts from bottom-center of parent
+    const x2 = childNode.x + NODE_DIAMETER / 2;
+    const y2 = childNode.y; // Line ends at top-center of child
+
+    lineEl.setAttribute("x1", x1.toString());
+    lineEl.setAttribute("y1", y1.toString());
+    lineEl.setAttribute("x2", x2.toString());
+    lineEl.setAttribute("y2", y2.toString());
+    lineEl.setAttribute("stroke", "#4b5563"); // Line color
+    lineEl.setAttribute("stroke-width", "2");
+    lineEl.setAttribute("marker-end", "url(#arrowhead)"); // Apply arrowhead
+
+    svgContainer.appendChild(lineEl);
+  }
+
+  // --- Highlighting ---
+  let currentHighlightNode = null;
+  let predecessorHighlightNode = null;
+  let pathHighlightNodes = [];
+
+  function applyHighlights() {
+    document.querySelectorAll('.node').forEach(el => {
+      el.classList.remove('current-node-highlight', 'predecessor-node-highlight', 'path-highlight');
+    });
+    if (currentHighlightNode && currentHighlightNode.domElement) {
+      currentHighlightNode.domElement.classList.add('current-node-highlight');
+    }
+    if (predecessorHighlightNode && predecessorHighlightNode.domElement) {
+      predecessorHighlightNode.domElement.classList.add('predecessor-node-highlight');
+    }
+    pathHighlightNodes.forEach(node => {
+      if (node && node.domElement) {
+        node.domElement.classList.add('path-highlight');
+      }
+    });
+  }
+
+  // --- Flatten Algorithm (Generator) ---
+  function* flattenGenerator(rootNode) {
+    let curr = rootNode;
+    while (curr) {
+      currentHighlightNode = curr;
+      predecessorHighlightNode = null;
+      pathHighlightNodes = [];
+      yield { message: `当前处理节点: ${curr.val}` };
+
+      if (curr.left) {
+        pathHighlightNodes.push(curr.left);
+        let predecessor = curr.left;
+        yield { message: `节点 ${curr.val} 有左子树。查找左子树 (${curr.left.val}) 的最右节点...` };
+        while (predecessor.right) {
+          predecessor = predecessor.right;
+          pathHighlightNodes.push(predecessor);
+          yield { message: `...继续向右查找, 当前为 ${predecessor.val}` };
+        }
+        predecessorHighlightNode = predecessor;
+        yield { message: `找到前驱节点: ${predecessor.val}` };
+        const oldCurrRight = curr.right;
+        yield { message: `将前驱节点 ${predecessor.val} 的右指针指向当前节点 ${curr.val} 的右子树 ${oldCurrRight ? '('+oldCurrRight.val+')' : '(null)'}` };
+        predecessor.right = curr.right;
+
+        const oldCurrLeft = curr.left;
+        yield { message: `将当前节点 ${curr.val} 的右指针指向其左子树 (${oldCurrLeft.val})` };
+        curr.right = curr.left;
+
+        yield { message: `将当前节点 ${curr.val} 的左子树置为 null` };
+        curr.left = null;
+        pathHighlightNodes = [];
+      } else {
+        yield { message: `节点 ${curr.val} 没有左子树，直接处理其右子节点。` };
+      }
+
+      if (!curr.right) {
+        currentHighlightNode = curr;
+        predecessorHighlightNode = null;
+        yield { message: `到达链表末端: ${curr.val}`};
+      }
+      curr = curr.right;
+    }
+    currentHighlightNode = null;
+    predecessorHighlightNode = null;
+    pathHighlightNodes = [];
+    yield { message: '二叉树已成功展开为链表！', done: true };
+  }
+
+  // --- Event Listeners and Control ---
+  loadTreeBtn.addEventListener('click', () => {
+    const inputValue = treeInput.value.trim();
+    if (!inputValue) {
+      messageArea.textContent = '请输入树的数组表示。';
+      messageArea.className = 'message-box bg-red-100 border-red-300 text-red-800';
+      return;
+    }
+    const parseResult = parseInputString(inputValue);
+    if (parseResult.error) {
+      messageArea.textContent = parseResult.error;
+      messageArea.className = 'message-box bg-red-100 border-red-300 text-red-800';
+      treeRoot = null;
+    } else {
+      originalTreeData = parseResult.data;
+      treeRoot = buildTreeFromArray([...originalTreeData]);
+      messageArea.textContent = '树已加载。点击“下一步”开始展开。';
+      messageArea.className = 'message-box bg-sky-100 border-sky-300 text-sky-800';
+    }
+    currentHighlightNode = null;
+    predecessorHighlightNode = null;
+    pathHighlightNodes = [];
+    renderTree(treeRoot); // This will now also create/update the SVG lines
+    if (treeRoot) {
+      flattenIterator = flattenGenerator(treeRoot);
+      nextStepBtn.disabled = false;
+      flattenAllBtn.disabled = false;
+    } else {
+      nextStepBtn.disabled = true;
+      flattenAllBtn.disabled = true;
+    }
+  });
+
+  nextStepBtn.addEventListener('click', () => {
+    if (!flattenIterator) return;
+    const step = flattenIterator.next();
+    if (step.value) {
+      messageArea.textContent = step.value.message;
+    }
+    renderTree(treeRoot);
+
+    if (step.done || (step.value && step.value.done)) {
+      messageArea.textContent = step.value ? step.value.message : '展开完成!';
+      messageArea.className = 'message-box bg-green-100 border-green-300 text-green-800';
+      nextStepBtn.disabled = true;
+      flattenAllBtn.disabled = true;
+      currentHighlightNode = null;
+      predecessorHighlightNode = null;
+      pathHighlightNodes = [];
+      renderTree(treeRoot); // Final render
+    }
+  });
+
+  flattenAllBtn.addEventListener('click', () => {
+    if (!treeRoot) return;
+    let tempRoot = buildTreeFromArray([...originalTreeData]);
+    let localIterator = flattenGenerator(tempRoot);
+    let currentStep;
+    do {
+      currentStep = localIterator.next();
+    } while (!currentStep.done && !(currentStep.value && currentStep.value.done));
+    treeRoot = tempRoot;
+    currentHighlightNode = null;
+    predecessorHighlightNode = null;
+    pathHighlightNodes = [];
+    renderTree(treeRoot);
+    messageArea.textContent = '二叉树已一键展开为链表！';
+    messageArea.className = 'message-box bg-green-100 border-green-300 text-green-800';
+    nextStepBtn.disabled = true;
+    flattenAllBtn.disabled = true;
+    flattenIterator = null;
+  });
+
+  window.addEventListener('load', () => {
+    loadTreeBtn.click();
+  });
+</script>
+</body>
+</html>
