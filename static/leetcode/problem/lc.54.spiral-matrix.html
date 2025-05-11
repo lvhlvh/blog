@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-TF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>螺旋矩阵算法演示</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f3f4f6; /* Tailwind gray-100 */
+      color: #1f2937; /* Tailwind gray-800 */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      background-color: white;
+      padding: 2rem;
+      border-radius: 0.75rem; /* Tailwind rounded-xl */
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Tailwind shadow-lg */
+      width: 100%;
+      max-width: 900px;
+      text-align: center; /* Added to center inline-block children like matrix-visualization-area */
+    }
+
+    .matrix-visualization-area {
+      position: relative;
+      display: inline-block; /* To wrap content tightly for centering */
+      padding: 60px; /* Increased Space for pointers, especially when overlapping */
+      margin-bottom: 1.5rem;
+      box-sizing: content-box;
+    }
+
+    .boundary-indicator {
+      position: absolute;
+      background-color: #e0e7ff; /* Tailwind indigo-200 */
+      color: #3730a3; /* Tailwind indigo-800 */
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      white-space: nowrap;
+      z-index: 10;
+      transition: top 0.3s ease, left 0.3s ease, opacity 0.3s ease;
+      opacity: 0; /* Hidden by default, shown by JS */
+    }
+    .boundary-indicator.visible {
+      opacity: 1;
+    }
+
+
+    .matrix-grid {
+      display: grid;
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      border-radius: 0.375rem; /* Tailwind rounded-md */
+      overflow: hidden;
+    }
+    .matrix-cell {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-bottom: 1px solid #e5e7eb; /* Tailwind gray-200 */
+      box-sizing: border-box;
+      font-size: 1rem; /* Tailwind text-base */
+      font-weight: 500; /* Tailwind font-medium */
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .highlight-path-0 { background-color: #fecaca; color: #991b1b; } /* Tailwind red-200, text red-700 */
+    .highlight-path-1 { background-color: #bfdbfe; color: #1e40af; } /* Tailwind blue-200, text blue-700 */
+    .highlight-path-2 { background-color: #bbf7d0; color: #166534; } /* Tailwind green-200, text green-700 */
+    .highlight-path-3 { background-color: #fef08a; color: #854d0e; } /* Tailwind yellow-200, text yellow-700 */
+
+    .control-panel, .input-panel, .info-panel {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background-color: #f9fafb; /* Tailwind gray-50 */
+      border-radius: 0.5rem; /* Tailwind rounded-lg */
+      text-align: left; /* Reset text-align for these panels */
+    }
+    .info-panel p {
+      margin-bottom: 0.5rem;
+    }
+    .info-panel strong {
+      color: #4b5563; /* Tailwind gray-600 */
+    }
+
+    button, input[type="number"], textarea {
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem; /* Tailwind rounded-md */
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      font-size: 0.875rem; /* Tailwind text-sm */
+      margin: 0.25rem;
+      transition: all 0.2s ease;
+    }
+    button {
+      background-color: #3b82f6; /* Tailwind blue-500 */
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2563eb; /* Tailwind blue-600 */
+    }
+    button:disabled {
+      background-color: #9ca3af; /* Tailwind gray-400 */
+      cursor: not-allowed;
+    }
+    textarea {
+      width: calc(100% - 0.5rem);
+      min-height: 80px;
+    }
+    input[type="number"] {
+      width: 70px;
+    }
+    .path-color-legend span {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      vertical-align: middle;
+      border-radius: 0.125rem;
+    }
+    #resultSequence {
+      background-color: #eef2ff; /* Tailwind indigo-50 */
+      padding: 0.75rem;
+      border-radius: 0.375rem; /* Tailwind rounded-md */
+      min-height: 30px;
+      word-wrap: break-word;
+      border: 1px dashed #c7d2fe; /* Tailwind indigo-200 */
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1 class="text-3xl font-bold text-center mb-6 text-gray-700">螺旋矩阵算法演示</h1>
+
+  <div class="input-panel">
+    <h2 class="text-xl font-semibold mb-3 text-gray-600">1. 输入矩阵</h2>
+    <div class="mb-4">
+      <label for="matrixInput" class="block mb-1 font-medium text-gray-700">直接输入矩阵 (例如: [[1,2,3],[4,5,6],[7,8,9]]):</label>
+      <textarea id="matrixInput" rows="3" placeholder="[[1,2,3],[4,5,6],[7,8,9]]">[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]</textarea>
+    </div>
+    <div class="flex items-center mb-2">
+      <span class="mr-2 text-gray-700">或者:</span>
+      <label for="rows" class="mr-1 font-medium text-gray-700">行数:</label>
+      <input type="number" id="rows" min="1" max="10" value="4" class="mr-3">
+      <label for="cols" class="mr-1 font-medium text-gray-700">列数:</label>
+      <input type="number" id="cols" min="1" max="10" value="4" class="mr-3">
+      <button id="generateRandomBtn">生成随机矩阵</button>
+    </div>
+    <button id="initializeBtn" class="w-full bg-green-500 hover:bg-green-600">初始化/重置矩阵</button>
+  </div>
+
+  <div class="info-panel">
+    <h2 class="text-xl font-semibold mb-3 text-gray-600">2. 算法状态</h2>
+    <p>当前步骤: <strong id="currentStep">未开始</strong></p>
+    <p>边界 (数值): Top: <strong id="boundaryTop">-</strong>, Bottom: <strong id="boundaryBottom">-</strong>, Left: <strong id="boundaryLeft">-</strong>, Right: <strong id="boundaryRight">-</strong></p>
+    <p>当前方向: <strong id="currentDirection">-</strong></p>
+    <div class="path-color-legend mt-2">
+      路径颜色:
+      <span style="background-color: #fecaca;"></span> 右
+      <span style="background-color: #bfdbfe;"></span> 下
+      <span style="background-color: #bbf7d0;"></span> 左
+      <span style="background-color: #fef08a;"></span> 上
+    </div>
+  </div>
+
+  <div class="matrix-visualization-area">
+    <div id="pointerDisplayTop" class="boundary-indicator">top →</div>
+    <div id="pointerDisplayBottom" class="boundary-indicator">bottom →</div>
+    <div id="pointerDisplayLeft" class="boundary-indicator">left ↓</div>
+    <div id="pointerDisplayRight" class="boundary-indicator">right ↓</div>
+    <div id="matrixGrid" class="matrix-grid">
+    </div>
+  </div>
+
+
+  <div class="control-panel">
+    <h2 class="text-xl font-semibold mb-3 text-gray-600">3. 控制</h2>
+    <div class="flex justify-center">
+      <button id="prevStepBtn" disabled>上一步</button>
+      <button id="nextStepBtn" disabled>下一步</button>
+      <button id="autoPlayBtn" disabled>自动播放</button>
+      <button id="pauseBtn" disabled class="bg-orange-500 hover:bg-orange-600">暂停</button>
+    </div>
+  </div>
+
+  <div class="info-panel">
+    <h2 class="text-xl font-semibold mb-3 text-gray-600">4. 遍历结果序列</h2>
+    <div id="resultSequence" class="text-gray-700">-</div>
+  </div>
+
+  <div id="messageBox" class="fixed top-5 right-5 bg-red-500 text-white p-3 rounded-md shadow-lg hidden animate-pulse">
+  </div>
+
+</div>
+
+<script>
+  // DOM Elements
+  const matrixInputEl = document.getElementById('matrixInput');
+  const rowsInputEl = document.getElementById('rows');
+  const colsInputEl = document.getElementById('cols');
+  const generateRandomBtn = document.getElementById('generateRandomBtn');
+  const initializeBtn = document.getElementById('initializeBtn');
+  const matrixGridEl = document.getElementById('matrixGrid');
+  const prevStepBtn = document.getElementById('prevStepBtn');
+  const nextStepBtn = document.getElementById('nextStepBtn');
+  const autoPlayBtn = document.getElementById('autoPlayBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resultSequenceEl = document.getElementById('resultSequence');
+  const currentStepEl = document.getElementById('currentStep');
+  const boundaryTopEl = document.getElementById('boundaryTop');
+  const boundaryBottomEl = document.getElementById('boundaryBottom');
+  const boundaryLeftEl = document.getElementById('boundaryLeft');
+  const boundaryRightEl = document.getElementById('boundaryRight');
+  const currentDirectionEl = document.getElementById('currentDirection');
+  const messageBoxEl = document.getElementById('messageBox');
+
+  // Boundary Pointer DOM Elements
+  const pointerDisplayTopEl = document.getElementById('pointerDisplayTop');
+  const pointerDisplayBottomEl = document.getElementById('pointerDisplayBottom');
+  const pointerDisplayLeftEl = document.getElementById('pointerDisplayLeft');
+  const pointerDisplayRightEl = document.getElementById('pointerDisplayRight');
+
+
+  // Algorithm and State Variables
+  let matrix = [];
+  let rows = 0;
+  let cols = 0;
+  let history = [];
+  let currentState = {};
+  let pathColors = ['highlight-path-0', 'highlight-path-1', 'highlight-path-2', 'highlight-path-3'];
+  let autoPlayInterval = null;
+  let autoPlaySpeed = 700; // milliseconds
+  const CELL_SIZE = 50; // px, matches CSS .matrix-cell width/height
+  const POINTER_AREA_PADDING = 60; // px, matches CSS .matrix-visualization-area padding (increased)
+  const POINTER_OFFSET_WHEN_OVERLAPPING = 15; // px, how much to shift overlapping pointers
+
+  // --- Utility Functions ---
+  function showMessage(message, duration = 3000) {
+    messageBoxEl.textContent = message;
+    messageBoxEl.classList.remove('hidden');
+    setTimeout(() => {
+      messageBoxEl.classList.add('hidden');
+    }, duration);
+  }
+
+  // --- Matrix Generation and Display ---
+  generateRandomBtn.addEventListener('click', () => {
+    const numRows = parseInt(rowsInputEl.value);
+    const numCols = parseInt(colsInputEl.value);
+    if (isNaN(numRows) || isNaN(numCols) || numRows < 1 || numCols < 1 || numRows > 10 || numCols > 10) {
+      showMessage("请输入1到10之间的有效行数和列数。");
+      return;
+    }
+    let randomMatrix = [];
+    let counter = 1;
+    for (let i = 0; i < numRows; i++) {
+      let row = [];
+      for (let j = 0; j < numCols; j++) {
+        row.push(counter++);
+      }
+      randomMatrix.push(row);
+    }
+    matrixInputEl.value = JSON.stringify(randomMatrix);
+  });
+
+  initializeBtn.addEventListener('click', initializeVisualization);
+
+  function initializeVisualization() {
+    if (autoPlayInterval) clearInterval(autoPlayInterval);
+    autoPlayBtn.textContent = "自动播放";
+    pauseBtn.disabled = true;
+
+    try {
+      const inputText = matrixInputEl.value.trim();
+      if (!inputText) {
+        showMessage("矩阵输入不能为空。");
+        return;
+      }
+      matrix = JSON.parse(inputText);
+      if (!Array.isArray(matrix) || matrix.length === 0 || !Array.isArray(matrix[0])) {
+        throw new Error("无效的矩阵格式。");
+      }
+      rows = matrix.length;
+      cols = matrix[0].length;
+      if (rows === 0 || cols === 0) {
+        throw new Error("矩阵不能为空。");
+      }
+      matrix.forEach(row => {
+        if (row.length !== cols) throw new Error("矩阵各行必须有相同的列数。");
+      });
+
+    } catch (e) {
+      showMessage("矩阵解析错误: " + e.message);
+      console.error(e);
+      return;
+    }
+
+    history = [];
+    currentState = {
+      r: 0, // current row
+      c: 0, // current col
+      direction: 0, // 0: right, 1: down, 2: left, 3: up
+      colorIndex: 0,
+      top: 0,
+      bottom: rows - 1,
+      left: 0,
+      right: cols - 1,
+      result: [],
+      cellStates: createInitialCellStates(), // Store { value, originalClass, highlightClass }
+      stepsTaken: 0,
+      totalElements: rows * cols,
+      isComplete: false
+    };
+
+    saveState(); // Save initial state
+    renderMatrix();
+    updateInfoPanel();
+
+    resultSequenceEl.textContent = "-";
+    nextStepBtn.disabled = false;
+    prevStepBtn.disabled = true;
+    autoPlayBtn.disabled = false;
+
+    // Initial pointer display is handled by DOMContentLoaded listener
+    // This ensures they are positioned correctly after the first render and layout.
+  }
+
+  function createInitialCellStates() {
+    const states = [];
+    for (let i = 0; i < rows; i++) {
+      states[i] = [];
+      for (let j = 0; j < cols; j++) {
+        states[i][j] = { value: matrix[i][j], highlightClass: '' }; // No highlight initially
+      }
+    }
+    return states;
+  }
+
+  function renderMatrix() {
+    matrixGridEl.innerHTML = '';
+    matrixGridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const cell = document.createElement('div');
+        cell.classList.add('matrix-cell');
+        cell.id = `cell-${i}-${j}`;
+
+        const cellState = currentState.cellStates[i][j];
+        cell.textContent = cellState.value;
+        if (cellState.highlightClass) {
+          cell.classList.add(cellState.highlightClass);
+        }
+
+        if (i === rows - 1) cell.style.borderBottom = 'none';
+        matrixGridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function updateBoundaryPointersDisplay() {
+    // Ensure elements are ready, visible and currentState is initialized
+    if (!pointerDisplayTopEl || !matrixGridEl.offsetParent || !currentState.hasOwnProperty('top')) return;
+
+    const baseTopY = POINTER_AREA_PADDING + (currentState.top * CELL_SIZE) + (CELL_SIZE / 2) - (pointerDisplayTopEl.offsetHeight / 2);
+    const baseBottomY = POINTER_AREA_PADDING + (currentState.bottom * CELL_SIZE) + (CELL_SIZE / 2) - (pointerDisplayBottomEl.offsetHeight / 2);
+    const baseLeftX = POINTER_AREA_PADDING + (currentState.left * CELL_SIZE) + (CELL_SIZE / 2) - (pointerDisplayLeftEl.offsetWidth / 2);
+    const baseRightX = POINTER_AREA_PADDING + (currentState.right * CELL_SIZE) + (CELL_SIZE / 2) - (pointerDisplayRightEl.offsetWidth / 2);
+
+    // Top pointer
+    pointerDisplayTopEl.style.top = `${currentState.top === currentState.bottom && currentState.top <= currentState.bottom ? baseTopY - POINTER_OFFSET_WHEN_OVERLAPPING : baseTopY}px`;
+    pointerDisplayTopEl.style.left = `${POINTER_AREA_PADDING - pointerDisplayTopEl.offsetWidth - 10}px`;
+
+    // Bottom pointer
+    pointerDisplayBottomEl.style.top = `${currentState.top === currentState.bottom && currentState.top <= currentState.bottom ? baseBottomY + POINTER_OFFSET_WHEN_OVERLAPPING : baseBottomY}px`;
+    pointerDisplayBottomEl.style.left = `${POINTER_AREA_PADDING - pointerDisplayBottomEl.offsetWidth - 10}px`;
+
+    // Left pointer
+    pointerDisplayLeftEl.style.left = `${currentState.left === currentState.right && currentState.left <= currentState.right ? baseLeftX - POINTER_OFFSET_WHEN_OVERLAPPING : baseLeftX}px`;
+    pointerDisplayLeftEl.style.top = `${POINTER_AREA_PADDING - pointerDisplayLeftEl.offsetHeight - 10}px`;
+
+    // Right pointer
+    pointerDisplayRightEl.style.left = `${currentState.left === currentState.right && currentState.left <= currentState.right ? baseRightX + POINTER_OFFSET_WHEN_OVERLAPPING : baseRightX}px`;
+    pointerDisplayRightEl.style.top = `${POINTER_AREA_PADDING - pointerDisplayRightEl.offsetHeight - 10}px`;
+
+    // REMOVED: Opacity logic that hides pointers when boundaries cross.
+    // Pointers will now remain visible at their last valid or crossed position.
+    // pointerDisplayTopEl.style.opacity = currentState.top <= currentState.bottom ? '1' : '0';
+    // pointerDisplayBottomEl.style.opacity = currentState.top <= currentState.bottom ? '1' : '0';
+    // pointerDisplayLeftEl.style.opacity = currentState.left <= currentState.right ? '1' : '0';
+    // pointerDisplayRightEl.style.opacity = currentState.left <= currentState.right ? '1' : '0';
+  }
+
+
+  // --- Step Logic ---
+  nextStepBtn.addEventListener('click', executeNextStep);
+  prevStepBtn.addEventListener('click', executePrevStep);
+
+  function executeNextStep() {
+    if (!currentState.hasOwnProperty('top')) {
+      showMessage("请先初始化矩阵。");
+      return;
+    }
+    // Check if already complete before proceeding
+    if (currentState.isComplete) { // Handles cases where it was completed manually then next is clicked
+      showMessage("遍历已完成！", 5000);
+      nextStepBtn.disabled = true;
+      autoPlayBtn.disabled = true;
+      return;
+    }
+    // If result has all elements, mark complete and exit (this is a more robust check)
+    if (currentState.result.length >= currentState.totalElements && currentState.totalElements > 0) {
+      currentState.isComplete = true;
+      updateInfoPanel();
+      updateBoundaryPointersDisplay();
+      nextStepBtn.disabled = true;
+      autoPlayBtn.disabled = true;
+      if (autoPlayInterval) clearInterval(autoPlayInterval);
+      showMessage("遍历完成！", 5000);
+      return;
+    }
+
+
+    let nextState = JSON.parse(JSON.stringify(currentState));
+    const { r, c, direction, top, bottom, left, right, colorIndex } = nextState;
+
+    // Add current element to result and highlight it, only if not already complete
+    if (nextState.result.length < nextState.totalElements && !isCellVisited(r,c, nextState.cellStates)) {
+      if (nextState.cellStates[r][c].highlightClass === '') {
+        nextState.result.push(matrix[r][c]);
+        nextState.cellStates[r][c].highlightClass = pathColors[nextState.colorIndex];
+      }
+    }
+
+    // Determine next move and update boundaries/direction
+    if (direction === 0) { // Moving Right
+      if (c < right) {
+        nextState.c++;
+      } else {
+        nextState.top++;
+        nextState.direction = 1;
+        nextState.colorIndex = (colorIndex + 1) % pathColors.length;
+        if (nextState.top <= nextState.bottom) nextState.r++; // Move to start of next segment only if valid
+      }
+    } else if (direction === 1) { // Moving Down
+      if (r < bottom) {
+        nextState.r++;
+      } else {
+        nextState.right--;
+        nextState.direction = 2;
+        nextState.colorIndex = (colorIndex + 1) % pathColors.length;
+        if (nextState.left <= nextState.right) nextState.c--;
+      }
+    } else if (direction === 2) { // Moving Left
+      if (c > left) {
+        nextState.c--;
+      } else {
+        nextState.bottom--;
+        nextState.direction = 3;
+        nextState.colorIndex = (colorIndex + 1) % pathColors.length;
+        if (nextState.top <= nextState.bottom) nextState.r--;
+      }
+    } else if (direction === 3) { // Moving Up
+      if (r > top) {
+        nextState.r--;
+      } else {
+        nextState.left++;
+        nextState.direction = 0;
+        nextState.colorIndex = (colorIndex + 1) % pathColors.length;
+        if (nextState.left <= nextState.right) nextState.c++;
+      }
+    }
+
+    // Check for completion after move and boundary update
+    // Completion is when all elements are gathered OR boundaries have crossed indicating no more traversable area.
+    if (nextState.result.length >= nextState.totalElements || (nextState.top > nextState.bottom || nextState.left > nextState.right)) {
+      nextState.isComplete = true;
+    }
+
+
+    nextState.stepsTaken++;
+    currentState = nextState;
+    saveState();
+
+    renderMatrix();
+    updateInfoPanel();
+    updateBoundaryPointersDisplay();
+
+    prevStepBtn.disabled = false;
+    if (currentState.isComplete) {
+      nextStepBtn.disabled = true;
+      autoPlayBtn.disabled = true;
+      if (autoPlayInterval) { // Stop autoplay if it was running
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+        // autoPlayBtn.textContent = "自动播放"; // Already disabled
+        // pauseBtn.disabled = true; // Already disabled by autoPlayBtn disable
+      }
+      showMessage("遍历完成！", 5000);
+    }
+  }
+
+  function isCellVisited(row, col, cellStates) {
+    return cellStates && cellStates[row] && cellStates[row][col] && cellStates[row][col].highlightClass !== '';
+  }
+
+  function executePrevStep() {
+    if (history.length <= 1) {
+      prevStepBtn.disabled = true;
+      return;
+    }
+    history.pop();
+    currentState = JSON.parse(JSON.stringify(history[history.length - 1]));
+    renderMatrix();
+    updateInfoPanel();
+    updateBoundaryPointersDisplay();
+
+    nextStepBtn.disabled = currentState.isComplete;
+    autoPlayBtn.disabled = currentState.isComplete;
+    if (history.length <= 1) prevStepBtn.disabled = true;
+
+    if (autoPlayInterval) {
+      clearInterval(autoPlayInterval);
+      autoPlayInterval = null;
+      autoPlayBtn.textContent = "自动播放"; // Reset text
+      // autoPlayBtn remains disabled if currentState.isComplete is true
+      pauseBtn.disabled = true;
+    }
+  }
+
+  function saveState() {
+    history.push(JSON.parse(JSON.stringify(currentState)));
+  }
+
+  // --- UI Updates ---
+  function updateInfoPanel() {
+    if (!currentState.hasOwnProperty('top')) return; // Not initialized yet
+
+    currentStepEl.textContent = `${currentState.stepsTaken} (共 ${currentState.totalElements} 个元素)`;
+    boundaryTopEl.textContent = currentState.top;
+    boundaryBottomEl.textContent = currentState.bottom;
+    boundaryLeftEl.textContent = currentState.left;
+    boundaryRightEl.textContent = currentState.right;
+    let directionText = "-";
+    if (!currentState.isComplete && currentState.result.length < currentState.totalElements) {
+      if (currentState.direction === 0) directionText = "向右 (→)";
+      else if (currentState.direction === 1) directionText = "向下 (↓)";
+      else if (currentState.direction === 2) directionText = "向左 (←)";
+      else if (currentState.direction === 3) directionText = "向上 (↑)";
+    } else if (currentState.isComplete) {
+      directionText = "完成";
+    }
+    currentDirectionEl.textContent = directionText;
+    resultSequenceEl.textContent = currentState.result.join(', ') || "-";
+  }
+
+  // --- Auto Play ---
+  autoPlayBtn.addEventListener('click', () => {
+    if (!currentState.hasOwnProperty('top')) { showMessage("请先初始化矩阵。"); return; }
+
+    if (autoPlayInterval) { // If interval exists, it means it's playing or paused.
+      // This button's role is to start or resume. If it's already playing, this click might be a misclick.
+      // If it's paused (autoPlayInterval is null), then this logic is fine.
+      // For simplicity, we assume if autoPlayInterval is not null, it's playing.
+      // The pause button should set autoPlayInterval to null.
+      return;
+    }
+
+    // Start or Resume playing
+    if (currentState.isComplete) return;
+
+    autoPlayBtn.textContent = "播放中...";
+    autoPlayBtn.disabled = true;
+    pauseBtn.disabled = false;
+    nextStepBtn.disabled = true;
+    prevStepBtn.disabled = true;
+
+    autoPlayInterval = setInterval(() => {
+      // executeNextStep will handle disabling buttons and clearing interval if complete
+      executeNextStep();
+      if(currentState.isComplete) { // Double check after step execution
+        autoPlayBtn.textContent = "自动播放"; // Reset text
+        // Buttons are already disabled by executeNextStep
+      }
+    }, autoPlaySpeed);
+  });
+
+  pauseBtn.addEventListener('click', () => {
+    if (autoPlayInterval) { // If playing, then pause
+      clearInterval(autoPlayInterval);
+      autoPlayInterval = null; // Crucial: indicate it's paused
+      autoPlayBtn.textContent = "继续播放";
+      autoPlayBtn.disabled = currentState.isComplete;
+      pauseBtn.disabled = true;
+      if (!currentState.isComplete) {
+        nextStepBtn.disabled = false;
+        prevStepBtn.disabled = history.length <=1;
+      }
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeVisualization();
+
+    requestAnimationFrame(() => {
+      if (pointerDisplayTopEl && pointerDisplayTopEl.offsetParent && currentState.hasOwnProperty('top')) {
+        updateBoundaryPointersDisplay();
+        [pointerDisplayTopEl, pointerDisplayBottomEl, pointerDisplayLeftEl, pointerDisplayRightEl].forEach(el => el.classList.add('visible'));
+      } else {
+        setTimeout(() => { // Fallback if not immediately in layout
+          if (currentState.hasOwnProperty('top')) {
+            updateBoundaryPointersDisplay();
+            [pointerDisplayTopEl, pointerDisplayBottomEl, pointerDisplayLeftEl, pointerDisplayRightEl].forEach(el => el.classList.add('visible'));
+          }
+        }, 100);
+      }
+    });
+  });
+</script>
+</body>
+</html>
