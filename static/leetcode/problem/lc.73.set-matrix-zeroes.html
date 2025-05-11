@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>矩阵置零</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f3f4f6; /* Tailwind gray-100 */
+      color: #1f2937; /* Tailwind gray-800 */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+      margin: 0;
+    }
+    .container {
+      background-color: white;
+      padding: 1.5rem;
+      border-radius: 0.75rem; /* Tailwind rounded-xl */
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Tailwind shadow-lg */
+      width: 100%;
+      max-width: 800px;
+    }
+    .matrix-grid {
+      display: grid;
+      gap: 0.5rem; /* Tailwind gap-2 */
+      margin-bottom: 1.5rem;
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      padding: 0.5rem;
+      border-radius: 0.5rem; /* Tailwind rounded-lg */
+      background-color: #f9fafb; /* Tailwind gray-50 */
+    }
+    .matrix-cell {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      border-radius: 0.25rem; /* Tailwind rounded-md */
+      font-weight: bold;
+      font-size: 1.125rem; /* Tailwind text-lg */
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    }
+    .cell-default { background-color: white; color: #1f2937; }
+    .cell-checking { background-color: #60a5fa; color: white; transform: scale(1.1); } /* Tailwind blue-400 */
+    .cell-marked-target { background-color: #facc15; color: #1f2937; transform: scale(1.1); } /* Tailwind yellow-400 */
+    .cell-marked-source { background-color: #fdba74; color: #1f2937; } /* Tailwind orange-300 */
+    .cell-zeroed-target { background-color: #f87171; color: white; transform: scale(1.1); } /* Tailwind red-400 */
+    .cell-zeroed-source-row { background-color: #fbbf24; color: #1f2937; } /* Tailwind amber-400 */
+    .cell-zeroed-source-col { background-color: #fbbf24; color: #1f2937; } /* Tailwind amber-400 */
+    .cell-final-zero { background-color: #ef4444; color: white; } /* Tailwind red-500 */
+    .cell-is-zero { background-color: #ef4444; color: white; } /* Tailwind red-500 */
+    .cell-first-row-col { background-color: #e0e7ff; } /* Tailwind indigo-100 for first row/col markers */
+
+
+    .explanation-box {
+      background-color: #eef2ff; /* Tailwind indigo-50 */
+      border: 1px solid #c7d2fe; /* Tailwind indigo-200 */
+      padding: 1rem;
+      border-radius: 0.5rem; /* Tailwind rounded-lg */
+      margin-bottom: 1.5rem;
+      min-height: 80px;
+      text-align: center;
+    }
+    .explanation-box h3 {
+      font-size: 1.125rem; /* Tailwind text-lg */
+      font-weight: 600; /* Tailwind semibold */
+      color: #3730a3; /* Tailwind indigo-800 */
+      margin-bottom: 0.5rem;
+    }
+    .explanation-box p {
+      font-size: 0.875rem; /* Tailwind text-sm */
+      color: #4338ca; /* Tailwind indigo-700 */
+    }
+    .flags-display {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 1.5rem;
+      padding: 0.75rem;
+      background-color: #f0f9ff; /* Tailwind sky-50 */
+      border-radius: 0.5rem; /* Tailwind rounded-lg */
+    }
+    .flag {
+      font-size: 0.875rem; /* Tailwind text-sm */
+      font-weight: 500; /* Tailwind medium */
+    }
+    .flag-true { color: #16a34a; } /* Tailwind green-600 */
+    .flag-false { color: #dc2626; } /* Tailwind red-600 */
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem; /* Tailwind gap-4 */
+    }
+    .control-button {
+      background-color: #3b82f6; /* Tailwind blue-500 */
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.375rem; /* Tailwind rounded-md */
+      font-weight: 500; /* Tailwind medium */
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    .control-button:hover {
+      background-color: #2563eb; /* Tailwind blue-600 */
+    }
+    .control-button:disabled {
+      background-color: #9ca3af; /* Tailwind gray-400 */
+      cursor: not-allowed;
+    }
+    .matrix-input-section {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background-color: #f9fafb; /* Tailwind gray-50 */
+      border-radius: 0.5rem; /* Tailwind rounded-lg */
+      border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+    }
+    .matrix-input-section label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500; /* Tailwind medium */
+      color: #374151; /* Tailwind gray-700 */
+    }
+    .matrix-input-section textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db; /* Tailwind gray-300 */
+      border-radius: 0.375rem; /* Tailwind rounded-md */
+      font-family: monospace;
+      font-size: 0.875rem; /* Tailwind text-sm */
+      resize: vertical;
+    }
+    .matrix-input-section button {
+      margin-top: 0.75rem;
+    }
+    .error-message {
+      color: #ef4444; /* Tailwind red-500 */
+      font-size: 0.875rem; /* Tailwind text-sm */
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1 class="text-2xl font-bold text-center text-gray-700 mb-6">交互式演示：O(1)空间复杂度设置矩阵零位</h1>
+
+  <div class="matrix-input-section">
+    <label for="matrixInput">输入矩阵 (例如: [[1,1,1],[1,0,1],[1,1,1]]):</label>
+    <textarea id="matrixInput" rows="4">[[1,2,3,4],[5,0,7,8],[0,10,11,12],[13,14,15,0]]</textarea>
+    <button id="loadMatrixBtn" class="control-button w-full">加载/重置矩阵</button>
+    <p id="matrixError" class="error-message"></p>
+  </div>
+
+  <div id="matrixContainer" class="matrix-grid"></div>
+
+  <div class="flags-display">
+    <div class="flag">第一行原始是否有零 (firstRowHasZero): <span id="firstRowFlag">N/A</span></div>
+    <div class="flag">第一列原始是否有零 (firstColHasZero): <span id="firstColFlag">N/A</span></div>
+  </div>
+
+  <div class="explanation-box">
+    <h3 id="phaseTitle">说明</h3>
+    <p id="explanationText">点击“加载/重置矩阵”开始，然后点击“下一步”逐步执行。</p>
+  </div>
+
+  <div class="controls">
+    <button id="prevStepBtn" class="control-button" disabled>上一步</button>
+    <button id="nextStepBtn" class="control-button" disabled>下一步</button>
+  </div>
+</div>
+
+<script>
+  const matrixContainer = document.getElementById('matrixContainer');
+  const explanationTextEl = document.getElementById('explanationText');
+  const phaseTitleEl = document.getElementById('phaseTitle');
+  const firstRowFlagEl = document.getElementById('firstRowFlag');
+  const firstColFlagEl = document.getElementById('firstColFlag');
+  const prevStepBtn = document.getElementById('prevStepBtn'); // Added
+  const nextStepBtn = document.getElementById('nextStepBtn');
+  const loadMatrixBtn = document.getElementById('loadMatrixBtn');
+  const matrixInputEl = document.getElementById('matrixInput');
+  const matrixErrorEl = document.getElementById('matrixError');
+
+  let originalMatrix = [];
+  let R = 0;
+  let C = 0;
+  let animationFrames = [];
+  let currentFrameIndex = -1;
+
+  function deepCopyMatrix(matrix) {
+    return matrix.map(row => [...row]);
+  }
+
+  function parseMatrixInput(inputStr) {
+    try {
+      const parsed = JSON.parse(inputStr);
+      if (!Array.isArray(parsed) || parsed.length === 0 || !Array.isArray(parsed[0])) {
+        throw new Error("输入必须是一个非空二维数组。");
+      }
+      const numCols = parsed[0].length;
+      if (numCols === 0) {
+        throw new Error("矩阵行不能为空。");
+      }
+      for (let i = 0; i < parsed.length; i++) {
+        if (!Array.isArray(parsed[i]) || parsed[i].length !== numCols) {
+          throw new Error("所有行必须有相同的列数。");
+        }
+        for (let j = 0; j < parsed[i].length; j++) {
+          if (typeof parsed[i][j] !== 'number') {
+            throw new Error("矩阵元素必须是数字。");
+          }
+        }
+      }
+      matrixErrorEl.textContent = '';
+      return parsed;
+    } catch (e) {
+      matrixErrorEl.textContent = "矩阵格式错误: " + e.message;
+      return null;
+    }
+  }
+
+  function generateAnimationFrames(matrix) {
+    const frames = [];
+    let currentMatrixState = deepCopyMatrix(matrix);
+    R = currentMatrixState.length;
+    C = currentMatrixState[0].length;
+
+    let frz = false; // firstRowHasZero
+    let fcz = false; // firstColHasZero
+
+    // Initial state
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "初始矩阵状态。",
+      phase: "初始化",
+      firstRowFlag: "N/A",
+      firstColFlag: "N/A",
+      highlights: []
+    });
+
+    // Phase 1: Check first row and first column
+    // Check first row
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "开始检查第一行是否原始包含0。",
+      phase: "1. 检查第一行/列",
+      firstRowFlag: "检查中...",
+      firstColFlag: "N/A",
+      highlights: Array(C).fill(0).map((_, c) => ({ r: 0, c, type: 'cell-first-row-col' }))
+    });
+    for (let j = 0; j < C; j++) {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `检查第一行: matrix[0][${j}] = ${currentMatrixState[0][j]}`,
+        phase: "1. 检查第一行/列",
+        firstRowFlag: "检查中...",
+        firstColFlag: "N/A",
+        highlights: [{ r: 0, c: j, type: 'cell-checking' }]
+      });
+      if (currentMatrixState[0][j] === 0) {
+        frz = true;
+        frames.push({
+          matrixState: deepCopyMatrix(currentMatrixState),
+          explanation: `发现 matrix[0][${j}] == 0。设置 firstRowHasZero = true。`,
+          phase: "1. 检查第一行/列",
+          firstRowFlag: `<span class="flag-true">true</span>`,
+          firstColFlag: "N/A",
+          highlights: [{ r: 0, c: j, type: 'cell-is-zero' }]
+        });
+        break;
+      }
+    }
+    if (!frz) {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `第一行检查完毕，没有发现0。firstRowHasZero = false。`,
+        phase: "1. 检查第一行/列",
+        firstRowFlag: `<span class="flag-false">false</span>`,
+        firstColFlag: "N/A",
+        highlights: []
+      });
+    }
+
+
+    // Check first col
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "开始检查第一列是否原始包含0。",
+      phase: "1. 检查第一行/列",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: "检查中...",
+      highlights: Array(R).fill(0).map((_, r) => ({ r, c: 0, type: 'cell-first-row-col' }))
+    });
+    for (let i = 0; i < R; i++) {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `检查第一列: matrix[${i}][0] = ${currentMatrixState[i][0]}`,
+        phase: "1. 检查第一行/列",
+        firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        firstColFlag: "检查中...",
+        highlights: [{ r: i, c: 0, type: 'cell-checking' }]
+      });
+      if (currentMatrixState[i][0] === 0) {
+        fcz = true;
+        frames.push({
+          matrixState: deepCopyMatrix(currentMatrixState),
+          explanation: `发现 matrix[${i}][0] == 0。设置 firstColHasZero = true。`,
+          phase: "1. 检查第一行/列",
+          firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+          firstColFlag: `<span class="flag-true">true</span>`,
+          highlights: [{ r: i, c: 0, type: 'cell-is-zero' }]
+        });
+        break;
+      }
+    }
+    if (!fcz) {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `第一列检查完毕，没有发现0。firstColHasZero = false。`,
+        phase: "1. 检查第一行/列",
+        firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        firstColFlag: `<span class="flag-false">false</span>`,
+        highlights: []
+      });
+    }
+    frames.push({ // Summary of step 1
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: `第一行/列检查完毕。firstRowHasZero = ${frz}, firstColHasZero = ${fcz}。`,
+      phase: "1. 检查第一行/列",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: []
+    });
+
+
+    // Phase 2: Use first row/col as markers for the rest of the matrix
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "开始使用第一行和第一列作为标记区域，扫描内部矩阵。",
+      phase: "2. 标记内部矩阵的零",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: [
+        ...Array(C).fill(0).map((_, c) => ({ r: 0, c, type: 'cell-first-row-col' })),
+        ...Array(R).fill(0).map((_, r) => ({ r, c: 0, type: 'cell-first-row-col' }))
+      ]
+    });
+    for (let i = 1; i < R; i++) {
+      for (let j = 1; j < C; j++) {
+        frames.push({
+          matrixState: deepCopyMatrix(currentMatrixState),
+          explanation: `检查内部矩阵: matrix[${i}][${j}] = ${currentMatrixState[i][j]}`,
+          phase: "2. 标记内部矩阵的零",
+          firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+          firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+          highlights: [
+            { r: i, c: j, type: 'cell-checking' },
+            ...Array(C).fill(0).map((_, c_idx) => ({ r: 0, c: c_idx, type: 'cell-first-row-col' })),
+            ...Array(R).fill(0).map((_, r_idx) => ({ r: r_idx, c: 0, type: 'cell-first-row-col' }))
+          ]
+        });
+        if (currentMatrixState[i][j] === 0) {
+          currentMatrixState[i][0] = 0;
+          currentMatrixState[0][j] = 0;
+          frames.push({
+            matrixState: deepCopyMatrix(currentMatrixState),
+            explanation: `发现 matrix[${i}][${j}] == 0。标记 matrix[${i}][0]=0 和 matrix[0][${j}]=0。`,
+            phase: "2. 标记内部矩阵的零",
+            firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            highlights: [
+              { r: i, c: j, type: 'cell-marked-source' },
+              { r: i, c: 0, type: 'cell-marked-target' },
+              { r: 0, c: j, type: 'cell-marked-target' },
+              ...Array(C).fill(0).filter((_,c_idx)=> c_idx !== j).map((_, c_idx) => ({ r: 0, c: c_idx, type: 'cell-first-row-col' })),
+              ...Array(R).fill(0).filter((_,r_idx)=> r_idx !== i).map((_, r_idx) => ({ r: r_idx, c: 0, type: 'cell-first-row-col' }))
+            ]
+          });
+        }
+      }
+    }
+    frames.push({ // Summary of step 2
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: `内部矩阵标记完毕。第一行和第一列现在包含了标记信息。`,
+      phase: "2. 标记内部矩阵的零",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: [
+        ...Array(C).fill(0).map((_, c) => ({ r: 0, c, type: 'cell-first-row-col' })),
+        ...Array(R).fill(0).map((_, r) => ({ r, c: 0, type: 'cell-first-row-col' }))
+      ]
+    });
+
+
+    // Phase 3: Zero out cells based on markers (for the rest of the matrix)
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "根据第一行和第一列的标记，清零内部矩阵的元素。",
+      phase: "3. 根据标记清零内部矩阵",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: [
+        ...Array(C).fill(0).map((_, c) => ({ r: 0, c, type: 'cell-first-row-col' })),
+        ...Array(R).fill(0).map((_, r) => ({ r, c: 0, type: 'cell-first-row-col' }))
+      ]
+    });
+    for (let i = 1; i < R; i++) {
+      for (let j = 1; j < C; j++) {
+        let highlightList = [
+          { r: i, c: j, type: 'cell-checking' },
+          { r: i, c: 0, type: 'cell-zeroed-source-row' },
+          { r: 0, c: j, type: 'cell-zeroed-source-col' },
+          ...Array(C).fill(0).filter((_,c_idx)=> c_idx !== j).map((_, c_idx) => ({ r: 0, c: c_idx, type: 'cell-first-row-col' })),
+          ...Array(R).fill(0).filter((_,r_idx)=> r_idx !== i).map((_, r_idx) => ({ r: r_idx, c: 0, type: 'cell-first-row-col' }))
+        ];
+
+        frames.push({
+          matrixState: deepCopyMatrix(currentMatrixState),
+          explanation: `检查 matrix[${i}][${j}]。依赖标记 matrix[${i}][0]=${currentMatrixState[i][0]} 和 matrix[0][${j}]=${currentMatrixState[0][j]}。`,
+          phase: "3. 根据标记清零内部矩阵",
+          firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+          firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+          highlights: highlightList
+        });
+        if (currentMatrixState[i][0] === 0 || currentMatrixState[0][j] === 0) {
+          if (currentMatrixState[i][j] !== 0) { // Only add frame if it actually changes
+            currentMatrixState[i][j] = 0;
+            frames.push({
+              matrixState: deepCopyMatrix(currentMatrixState),
+              explanation: `matrix[${i}][0]==0 或 matrix[0][${j}]==0。将 matrix[${i}][${j}] 置为 0。`,
+              phase: "3. 根据标记清零内部矩阵",
+              firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+              firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+              highlights: [
+                { r: i, c: j, type: 'cell-zeroed-target' },
+                { r: i, c: 0, type: 'cell-zeroed-source-row' },
+                { r: 0, c: j, type: 'cell-zeroed-source-col' },
+                ...Array(C).fill(0).filter((_,c_idx)=> c_idx !== j).map((_, c_idx) => ({ r: 0, c: c_idx, type: 'cell-first-row-col' })),
+                ...Array(R).fill(0).filter((_,r_idx)=> r_idx !== i).map((_, r_idx) => ({ r: r_idx, c: 0, type: 'cell-first-row-col' }))
+              ]
+            });
+          }
+        }
+      }
+    }
+    frames.push({ // Summary of step 3
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: `内部矩阵根据标记清零完毕。`,
+      phase: "3. 根据标记清零内部矩阵",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: []
+    });
+
+    // Phase 4: Zero out first row if needed
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: `检查是否需要清零第一行 (firstRowHasZero = ${frz})。`,
+      phase: "4. 清零第一行",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: frz ? Array(C).fill(0).map((_, c) => ({ r: 0, c, type: 'cell-checking' })) : []
+    });
+    if (frz) {
+      for (let j = 0; j < C; j++) {
+        if(currentMatrixState[0][j] !== 0) { // Only add frame if it actually changes
+          currentMatrixState[0][j] = 0;
+          frames.push({
+            matrixState: deepCopyMatrix(currentMatrixState),
+            explanation: `firstRowHasZero 为 true。将 matrix[0][${j}] 置为 0。`,
+            phase: "4. 清零第一行",
+            firstRowFlag: `<span class="flag-true">true</span>`,
+            firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            highlights: [{ r: 0, c: j, type: 'cell-final-zero' }]
+          });
+        } else { // If already zero, just show it's part of the process
+          frames.push({
+            matrixState: deepCopyMatrix(currentMatrixState),
+            explanation: `firstRowHasZero 为 true。matrix[0][${j}] 已经是 0。`,
+            phase: "4. 清零第一行",
+            firstRowFlag: `<span class="flag-true">true</span>`,
+            firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            highlights: [{ r: 0, c: j, type: 'cell-final-zero' }]
+          });
+        }
+      }
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `第一行清零完毕。`,
+        phase: "4. 清零第一行",
+        firstRowFlag: `<span class="flag-true">true</span>`,
+        firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        highlights: []
+      });
+    } else {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `firstRowHasZero 为 false，第一行无需额外操作。`,
+        phase: "4. 清零第一行",
+        firstRowFlag: `<span class="flag-false">false</span>`,
+        firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        highlights: []
+      });
+    }
+
+
+    // Phase 5: Zero out first col if needed
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: `检查是否需要清零第一列 (firstColHasZero = ${fcz})。`,
+      phase: "5. 清零第一列",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: fcz ? Array(R).fill(0).map((_, r) => ({ r, c: 0, type: 'cell-checking' })) : []
+    });
+    if (fcz) {
+      for (let i = 0; i < R; i++) {
+        if(currentMatrixState[i][0] !== 0) { // Only add frame if it actually changes
+          currentMatrixState[i][0] = 0;
+          frames.push({
+            matrixState: deepCopyMatrix(currentMatrixState),
+            explanation: `firstColHasZero 为 true。将 matrix[${i}][0] 置为 0。`,
+            phase: "5. 清零第一列",
+            firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            firstColFlag: `<span class="flag-true">true</span>`,
+            highlights: [{ r: i, c: 0, type: 'cell-final-zero' }]
+          });
+        } else { // If already zero, just show it's part of the process
+          frames.push({
+            matrixState: deepCopyMatrix(currentMatrixState),
+            explanation: `firstColHasZero 为 true。matrix[${i}][0] 已经是 0。`,
+            phase: "5. 清零第一列",
+            firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+            firstColFlag: `<span class="flag-true">true</span>`,
+            highlights: [{ r: i, c: 0, type: 'cell-final-zero' }]
+          });
+        }
+      }
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `第一列清零完毕。`,
+        phase: "5. 清零第一列",
+        firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        firstColFlag: `<span class="flag-true">true</span>`,
+        highlights: []
+      });
+    } else {
+      frames.push({
+        matrixState: deepCopyMatrix(currentMatrixState),
+        explanation: `firstColHasZero 为 false，第一列无需额外操作。`,
+        phase: "5. 清零第一列",
+        firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+        firstColFlag: `<span class="flag-false">false</span>`,
+        highlights: []
+      });
+    }
+
+    // Final state
+    frames.push({
+      matrixState: deepCopyMatrix(currentMatrixState),
+      explanation: "算法执行完毕。这是最终的矩阵。",
+      phase: "完成",
+      firstRowFlag: frz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      firstColFlag: fcz ? `<span class="flag-true">true</span>` : `<span class="flag-false">false</span>`,
+      highlights: []
+    });
+
+    return frames;
+  }
+
+  function renderMatrix(matrix, highlights = []) {
+    matrixContainer.innerHTML = '';
+    matrixContainer.style.gridTemplateColumns = `repeat(${C}, 1fr)`;
+
+    for (let i = 0; i < R; i++) {
+      for (let j = 0; j < C; j++) {
+        const cell = document.createElement('div');
+        cell.classList.add('matrix-cell');
+        cell.textContent = matrix[i][j];
+
+        // Apply default styling first
+        cell.classList.add('cell-default');
+
+        // Apply highlight styling
+        const highlight = highlights.find(h => h.r === i && h.c === j);
+        if (highlight) {
+          cell.classList.remove('cell-default');
+          cell.classList.add(highlight.type);
+        } else if ( (i===0 || j===0) && highlights.some(h => (h.type === 'cell-first-row-col' && (h.r === i || h.c ===j)) || (h.type === 'cell-zeroed-source-row' && h.r === i && j===0) || (h.type === 'cell-zeroed-source-col' && h.c ===j && i===0) ) ) {
+          if (highlights.some(h => h.type === 'cell-first-row-col')) cell.classList.add('cell-first-row-col');
+          if (highlights.some(h => h.type === 'cell-zeroed-source-row' && h.r === i && j===0 )) cell.classList.add('cell-zeroed-source-row');
+          if (highlights.some(h => h.type === 'cell-zeroed-source-col' && h.c === j && i===0 )) cell.classList.add('cell-zeroed-source-col');
+        }
+        // If cell value is 0 and not specifically highlighted otherwise, give it a general zero look
+        if (matrix[i][j] === 0 && !highlight) {
+          cell.classList.remove('cell-default');
+          cell.classList.add('cell-is-zero');
+        }
+
+
+        matrixContainer.appendChild(cell);
+      }
+    }
+  }
+
+  function displayFrame(frameIndex) {
+    if (frameIndex < 0 || frameIndex >= animationFrames.length) return;
+
+    const frame = animationFrames[frameIndex];
+    R = frame.matrixState.length;
+    C = frame.matrixState[0].length;
+    renderMatrix(frame.matrixState, frame.highlights);
+    explanationTextEl.innerHTML = frame.explanation; // Use innerHTML for flag spans
+    phaseTitleEl.textContent = frame.phase;
+    firstRowFlagEl.innerHTML = frame.firstRowFlag;
+    firstColFlagEl.innerHTML = frame.firstColFlag;
+
+    prevStepBtn.disabled = frameIndex === 0; // Disable prev if at first frame
+    nextStepBtn.disabled = frameIndex === animationFrames.length - 1; // Disable next if at last frame
+  }
+
+  function loadAndInitialize() {
+    const matrixStr = matrixInputEl.value;
+    const parsedMatrix = parseMatrixInput(matrixStr);
+    if (!parsedMatrix) {
+      prevStepBtn.disabled = true;
+      nextStepBtn.disabled = true;
+      matrixContainer.innerHTML = '';
+      return;
+    }
+
+    originalMatrix = parsedMatrix;
+    R = originalMatrix.length;
+    C = originalMatrix[0].length;
+
+    animationFrames = generateAnimationFrames(originalMatrix);
+    currentFrameIndex = 0;
+    displayFrame(currentFrameIndex);
+    prevStepBtn.disabled = true; // Initially at first frame
+    nextStepBtn.disabled = animationFrames.length <= 1;
+  }
+
+  nextStepBtn.addEventListener('click', () => {
+    if (currentFrameIndex < animationFrames.length - 1) {
+      currentFrameIndex++;
+      displayFrame(currentFrameIndex);
+    }
+  });
+
+  prevStepBtn.addEventListener('click', () => { // Added event listener for prev button
+    if (currentFrameIndex > 0) {
+      currentFrameIndex--;
+      displayFrame(currentFrameIndex);
+    }
+  });
+
+  loadMatrixBtn.addEventListener('click', loadAndInitialize);
+
+  // Initial load
+  loadAndInitialize();
+
+</script>
+</body>
+</html>
