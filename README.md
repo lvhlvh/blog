@@ -18,3 +18,6 @@
 ## 矩阵问题
 * [LC.54.螺旋矩阵](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.54.spiral-matrix.html)
 * [LC.73.矩阵置零](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.73.set-matrix-zeroes.html)
+
+## 栈
+* [LC.394.字符串解码](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.394.decode-string.html)

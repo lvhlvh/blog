@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-TF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字符串解码过程演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .min-h-stack {
+            min-height: 100px;
+        }
+        .min-h-str {
+            min-height: 3em; /* Approx 2 lines of text */
+        }
+        .log-area {
+            height: 200px; /* Fixed height for log area */
+        }
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-center text-indigo-700">LeetCode 字符串解码过程演示</h1>
+
+    <div class="mb-6 p-4 bg-white rounded-xl shadow-lg">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4">
+            <div class="flex-grow mb-3 sm:mb-0">
+                <label for="inputString" class="block text-sm font-medium text-gray-700 mb-1">输入编码字符串:</label>
+                <input type="text" id="inputString" value="3[a]2[bc]" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
+                <button id="startBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:shadow-lg transition duration-150 ease-in-out text-sm">开始/重载</button>
+                <button id="nextStepBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:shadow-lg transition duration-150 ease-in-out text-sm" disabled>下一步</button>
+                <button id="autoPlayBtn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:shadow-lg transition duration-150 ease-in-out text-sm" disabled>自动播放</button>
+                <button id="resetBtn" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md hover:shadow-lg transition duration-150 ease-in-out text-sm">重置状态</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="md:col-span-1 space-y-4">
+            <div class="p-4 bg-white rounded-xl shadow-lg">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">当前处理字符串:</h3>
+                <div id="currentS" class="text-sm text-gray-900 break-all font-mono p-3 bg-gray-100 rounded-md min-h-str border border-gray-200">N/A</div>
+            </div>
+            <div class="p-4 bg-white rounded-xl shadow-lg">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">currentNum:</h3>
+                <div id="currentNum" class="text-sm text-gray-900 font-mono p-3 bg-gray-100 rounded-md border border-gray-200">0</div>
+            </div>
+            <div class="p-4 bg-white rounded-xl shadow-lg">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">currentStr:</h3>
+                <div id="currentStr" class="text-sm text-gray-900 break-all font-mono p-3 bg-gray-100 rounded-md min-h-str border border-gray-200">""</div>
+            </div>
+        </div>
+
+        <div class="md:col-span-1 space-y-4">
+            <div class="p-4 bg-white rounded-xl shadow-lg h-full flex flex-col">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">countStack (数字栈):</h3>
+                <div id="countStack" class="text-sm text-gray-900 overflow-y-auto flex-grow font-mono p-3 bg-gray-100 rounded-md min-h-stack border border-gray-200">空</div>
+            </div>
+            <div class="p-4 bg-white rounded-xl shadow-lg h-full flex flex-col">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">strStack (字符串栈):</h3>
+                <div id="strStack" class="text-sm text-gray-900 overflow-y-auto flex-grow font-mono p-3 bg-gray-100 rounded-md min-h-stack border border-gray-200">空</div>
+            </div>
+        </div>
+
+        <div class="md:col-span-1 space-y-4">
+            <div class="p-4 bg-white rounded-xl shadow-lg h-full flex flex-col">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">执行日志:</h3>
+                <div id="logMessages" class="text-xs text-gray-700 overflow-y-auto log-area border border-gray-200 rounded-md p-3 bg-gray-100 flex-grow">点击“开始/重载”按钮启动。</div>
+            </div>
+            <div class="p-4 bg-white rounded-xl shadow-lg">
+                <h3 class="text-base font-semibold text-gray-800 mb-2">最终解码结果:</h3>
+                <div id="finalResult" class="text-lg font-bold text-green-600 break-all p-3 bg-gray-100 rounded-md min-h-str border border-gray-200">N/A</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- State Variables ---
+    let s = ""; // The input string
+    let charIndex = 0; // Current index in s
+    let currentNum = 0; // Number being parsed
+    let currentStr = ""; // String being built
+    let countStack = []; // Stack for numbers
+    let strStack = []; // Stack for strings
+    let isProcessing = false; // Flag to indicate if processing is ongoing
+    let autoPlayIntervalId = null; // ID for setInterval during auto-play
+
+    // --- DOM Elements ---
+    const inputStringEl = document.getElementById('inputString');
+    const startBtn = document.getElementById('startBtn');
+    const nextStepBtn = document.getElementById('nextStepBtn');
+    const autoPlayBtn = document.getElementById('autoPlayBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const currentSEl = document.getElementById('currentS');
+    const currentNumEl = document.getElementById('currentNum');
+    const currentStrEl = document.getElementById('currentStr');
+    const countStackEl = document.getElementById('countStack');
+    const strStackEl = document.getElementById('strStack');
+    const logMessagesEl = document.getElementById('logMessages');
+    const finalResultEl = document.getElementById('finalResult');
+
+    // --- Core Logic Functions ---
+
+    /**
+     * Initializes or re-initializes the state for processing.
+     * @param {string} inputStr The string to be decoded.
+     */
+    function initializeState(inputStr) {
+        s = inputStr;
+        charIndex = 0;
+        currentNum = 0;
+        currentStr = "";
+        countStack = [];
+        strStack = [];
+        isProcessing = true; // Ready to start processing
+
+        finalResultEl.textContent = 'N/A';
+        logMessagesEl.innerHTML = ''; // Clear previous logs
+        addLog(`初始化完成。输入字符串: "${s}"`);
+        updateDisplays();
+
+        // Enable/disable buttons
+        nextStepBtn.disabled = !s; // Disable if input string is empty
+        autoPlayBtn.disabled = !s;
+        autoPlayBtn.textContent = '自动播放';
+        if (autoPlayIntervalId) {
+            clearInterval(autoPlayIntervalId);
+            autoPlayIntervalId = null;
+        }
+    }
+
+    /**
+     * Executes one step of the decoding algorithm.
+     * @returns {boolean} True if a step was processed, false if processing is complete.
+     */
+    function step() {
+        if (charIndex >= s.length) {
+            addLog(`处理完成。最终结果: "${currentStr}"`);
+            finalResultEl.textContent = `"${currentStr}"`;
+            isProcessing = false;
+            stopAutoPlay(); // Ensure auto-play stops and buttons are updated
+            nextStepBtn.disabled = true;
+            autoPlayBtn.disabled = true;
+            return false; // Indicate processing is done
+        }
+
+        const ch = s[charIndex];
+        addLog(`步骤 ${charIndex + 1}: 处理字符 '${ch}' (索引 ${charIndex})`);
+
+        if (ch >= '0' && ch <= '9') { // Character.isDigit(ch)
+            currentNum = currentNum * 10 + (ch.charCodeAt(0) - '0'.charCodeAt(0));
+            addLog(`  字符 '${ch}' 是数字。 currentNum 更新为: ${currentNum}`);
+        } else if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) { // Character.isLetter(ch)
+            currentStr += ch;
+            addLog(`  字符 '${ch}' 是字母。 currentStr 更新为: "${currentStr}"`);
+        } else if (ch === '[') {
+            countStack.push(currentNum);
+            strStack.push(currentStr);
+            addLog(`  字符是 '['。将 ${currentNum} 推入 countStack，将 "${currentStr}" 推入 strStack。`);
+            currentNum = 0;
+            currentStr = "";
+            addLog(`  重置 currentNum 为 0，currentStr 为 ""。`);
+        } else if (ch === ']') {
+            if (countStack.length === 0 || strStack.length === 0) {
+                addLog(`  错误: 遇到 ']' 但栈为空，输入字符串格式可能无效。停止处理。`);
+                isProcessing = false;
+                stopAutoPlay();
+                nextStepBtn.disabled = true;
+                autoPlayBtn.disabled = true;
+                finalResultEl.textContent = "错误：字符串格式无效";
+                return false;
+            }
+            let decodedPart = "";
+            const repeatTimes = countStack.pop();
+            const prevStr = strStack.pop();
+            addLog(`  字符是 ']'。从 countStack 弹出 ${repeatTimes}，从 strStack 弹出 "${prevStr}"。`);
+
+            for (let i = 0; i < repeatTimes; ++i) {
+                decodedPart += currentStr;
+            }
+            addLog(`  重复 currentStr ("${currentStr}") ${repeatTimes} 次得到: "${decodedPart}"`);
+            currentStr = prevStr + decodedPart;
+            addLog(`  更新 currentStr 为 "${prevStr}" + "${decodedPart}" = "${currentStr}"`);
+        } else {
+            addLog(`  字符 '${ch}' 是未知类型，跳过。`);
+        }
+
+        charIndex++;
+        updateDisplays();
+        return true; // Indicate step was processed
+    }
+
+    // --- UI Update Functions ---
+
+    /**
+     * Adds a message to the log display.
+     * @param {string} message The message to log.
+     */
+    function addLog(message) {
+        const logEntry = document.createElement('div');
+        logEntry.className = 'py-0.5';
+        logEntry.textContent = message;
+        logMessagesEl.appendChild(logEntry);
+        logMessagesEl.scrollTop = logMessagesEl.scrollHeight; // Auto-scroll
+    }
+
+    /**
+     * Updates all display elements on the page based on the current state.
+     */
+    function updateDisplays() {
+        // Display current character pointer
+        let sDisplay = "";
+        if (s && s.length > 0) {
+            for (let i = 0; i < s.length; i++) {
+                if (i === charIndex && charIndex < s.length && isProcessing) {
+                    sDisplay += `<span class="bg-yellow-300 text-black px-1 rounded">${s[i]}</span>`;
+                } else {
+                    sDisplay += s[i];
+                }
+            }
+            currentSEl.innerHTML = sDisplay;
+        } else {
+            currentSEl.innerHTML = "N/A";
+        }
+
+
+        currentNumEl.textContent = currentNum;
+        currentStrEl.textContent = `"${currentStr}"`;
+
+        countStackEl.innerHTML = countStack.length === 0 ? '<span class="text-gray-500">空</span>' :
+            countStack.slice().reverse().map((item, index) =>
+                `<div class="border-b border-gray-200 p-1 ${index === 0 ? 'font-bold text-blue-600' : ''}">
+                        ${item} ${index === 0 ? ' <span class="text-xs text-gray-500">(栈顶)</span>' : ''}
+                    </div>`
+            ).join('');
+
+        strStackEl.innerHTML = strStack.length === 0 ? '<span class="text-gray-500">空</span>' :
+            strStack.slice().reverse().map((item, index) =>
+                `<div class="border-b border-gray-200 p-1 ${index === 0 ? 'font-bold text-blue-600' : ''}">
+                        "${item}" ${index === 0 ? ' <span class="text-xs text-gray-500">(栈顶)</span>' : ''}
+                    </div>`
+            ).join('');
+    }
+
+    // --- Event Handlers ---
+    startBtn.addEventListener('click', () => {
+        const inputStr = inputStringEl.value;
+        if (!inputStr) {
+            addLog("错误：请输入有效的编码字符串。");
+            finalResultEl.textContent = "错误：输入为空";
+            return;
+        }
+        initializeState(inputStr);
+    });
+
+    nextStepBtn.addEventListener('click', () => {
+        if (isProcessing) {
+            step();
+        } else {
+            addLog("处理已结束或未开始。请点击“开始/重载输入”。");
+        }
+    });
+
+    autoPlayBtn.addEventListener('click', () => {
+        if (autoPlayIntervalId) { // If currently playing, stop it (Pause)
+            stopAutoPlay();
+        } else { // If not playing, start it
+            if (!isProcessing) {
+                addLog("请先点击“开始/重载输入”以启动处理，然后才能自动播放。");
+                return;
+            }
+            autoPlayBtn.textContent = '暂停';
+            nextStepBtn.disabled = true; // Disable manual step during auto play
+            autoPlayIntervalId = setInterval(() => {
+                if (!step()) { // step() returns false if processing is done
+                    // stopAutoPlay(); // step() already calls stopAutoPlay via its completion logic
+                }
+            }, 800); // Auto-play speed: 800ms
+        }
+    });
+
+    /**
+     * Stops auto-play and updates button states.
+     */
+    function stopAutoPlay() {
+        if (autoPlayIntervalId) {
+            clearInterval(autoPlayIntervalId);
+            autoPlayIntervalId = null;
+        }
+        autoPlayBtn.textContent = '自动播放';
+        // Only enable nextStepBtn if processing is ongoing and not yet complete
+        nextStepBtn.disabled = !(isProcessing && charIndex < s.length);
+    }
+
+    resetBtn.addEventListener('click', () => {
+        const currentInput = inputStringEl.value || "3[a]2[bc]"; // Use current input or default
+        initializeState(currentInput); // Re-initialize with current or default input
+        addLog("状态已重置。");
+    });
+
+    // --- Initial Setup ---
+    window.onload = () => {
+        // Set a default input string
+        inputStringEl.value = "3[ab]2[cxy]z";
+        // Initialize display for a clean start, but don't start processing
+        currentSEl.textContent = "N/A";
+        currentNumEl.textContent = "0";
+        currentStrEl.textContent = "\"\"";
+        countStackEl.innerHTML = '<span class="text-gray-500">空</span>';
+        strStackEl.innerHTML = '<span class="text-gray-500">空</span>';
+        finalResultEl.textContent = "N/A";
+        logMessagesEl.innerHTML = '请输入字符串并点击“开始/重载输入”以启动演示。';
+
+        nextStepBtn.disabled = true;
+        autoPlayBtn.disabled = true;
+    };
+</script>
+</body>
+</html>
