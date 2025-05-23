@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickSelect 过程演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff; /* White card background */
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 900px; /* Max width for larger screens */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #array-container {
+            display: flex;
+            align-items: flex-end;
+            height: 250px; /* Increased height */
+            border-bottom: 2px solid #cbd5e1; /* Slate-300 */
+            padding-bottom: 35px; /* Increased padding for pointers */
+            position: relative; /* For absolute positioning of bars and pointers */
+            overflow-x: auto; /* Allow horizontal scroll if too many bars */
+            overflow-y: hidden;
+        }
+        .bar-wrapper { /* Wrapper for bar and its value label */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: absolute; /* Positioned by JS */
+            transition: left 0.5s ease-in-out, background-color 0.3s ease-in-out;
+        }
+        .bar {
+            width: 30px; /* Slightly wider bars */
+            background-color: #60a5fa; /* Blue-400 */
+            border: 1px solid #3b82f6; /* Blue-500 */
+            border-radius: 4px 4px 0 0; /* Rounded top corners */
+            transition: height 0.3s ease-in-out, background-color 0.3s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .bar-value {
+            font-size: 0.75rem; /* 12px */
+            color: #475569; /* Slate-600 */
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        .pivot { background-color: #facc15 !important; /* Yellow-400 */ border-color: #eab308; /* Yellow-500 */ }
+        .current-i { background-color: #fb923c !important; /* Orange-400 */ border-color: #f97316; /* Orange-500 */ }
+        .current-p-marker { background-color: #a78bfa !important; /* Violet-400 */ border-color: #8b5cf6; /* Violet-500 */ }
+        .less-equal { background-color: #22c55e !important; /* Green-500 */ border-color: #16a34a; /* Green-600 */ }
+        .final-kth {
+            background-color: #ec4899 !important; /* Pink-500 */
+            border: 2px solid #db2777 !important; /* Pink-600 */
+            box-shadow: 0 0 15px #ec4899;
+        }
+        .swapping {
+            opacity: 0.7;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px #ef4444; /* Red-500 */
+        }
+
+        .controls, .info {
+            display: flex;
+            flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+            gap: 10px;
+            align-items: center;
+            justify-content: center; /* Center controls */
+        }
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1; /* Slate-300 */
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 150px; /* Fixed width for inputs */
+        }
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            background-color: #3b82f6; /* Blue-500 */
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+            background-color: #2563eb; /* Blue-600 */
+        }
+        button:disabled {
+            background-color: #9ca3af; /* Gray-400 */
+            cursor: not-allowed;
+        }
+        #status-message {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #1e293b; /* Slate-800 */
+            min-height: 20px; /* Ensure space for message */
+            text-align: center;
+            width: 100%;
+        }
+        .pointer-container {
+            position: absolute;
+            bottom: 0px; /* Position pointers at the very bottom of array-container */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            transition: left 0.5s ease-in-out;
+            /* width: 30px; REMOVED - width will be auto based on content */
+            text-align: center;
+            z-index: 10;
+            padding: 0 2px; /* Add small padding so pointer text doesn't touch edges if side-by-side */
+        }
+        .pointer-arrow {
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 8px solid currentColor; /* Arrow pointing up towards the bar */
+        }
+        #pointer-l { color: #ef4444; /* Red-500 */ }
+        #pointer-r { color: #ef4444; /* Red-500 */ }
+        #pointer-p { color: #a855f7; /* Purple-500 */ }
+        #pointer-i { color: #f97316; /* Orange-500 */ }
+
+        /* Animation speed control */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="range"] {
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="text-2xl font-bold text-center text-slate-700">QuickSelect 过程演示 (查找第 K 大元素)</h1>
+
+    <div class="controls">
+        <div class="control-group">
+            <label for="array-input" class="text-sm font-medium text-slate-600">数组 (逗号分隔):</label>
+            <input type="text" id="array-input" value="7,10,4,3,20,15,8">
+        </div>
+        <div class="control-group">
+            <label for="k-input" class="text-sm font-medium text-slate-600">K (第K大):</label>
+            <input type="number" id="k-input" value="3" min="1">
+        </div>
+        <div class="control-group slider-container">
+            <label for="speed-slider" class="text-sm font-medium text-slate-600">速度:</label>
+            <input type="range" id="speed-slider" min="100" max="2000" value="700" step="100">
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="start-btn">开始/重置</button>
+        <button id="step-btn" disabled>单步</button>
+        <button id="auto-btn" disabled>自动播放</button>
+    </div>
+
+    <div id="array-container">
+        <div id="pointer-l" class="pointer-container" style="display: none;">L<div class="pointer-arrow"></div></div>
+        <div id="pointer-r" class="pointer-container" style="display: none;">R<div class="pointer-arrow"></div></div>
+        <div id="pointer-p" class="pointer-container" style="display: none;">P<div class="pointer-arrow"></div></div>
+        <div id="pointer-i" class="pointer-container" style="display: none;">I<div class="pointer-arrow"></div></div>
+    </div>
+    <div id="status-message">请输入数组和K值，然后点击开始。</div>
+</div>
+
+<script>
+    const arrayContainer = document.getElementById('array-container');
+    const startBtn = document.getElementById('start-btn');
+    const stepBtn = document.getElementById('step-btn');
+    const autoBtn = document.getElementById('auto-btn');
+    const arrayInput = document.getElementById('array-input');
+    const kInput = document.getElementById('k-input');
+    const statusMessage = document.getElementById('status-message');
+    const speedSlider = document.getElementById('speed-slider');
+
+    const pointerL = document.getElementById('pointer-l');
+    const pointerR = document.getElementById('pointer-r');
+    const pointerP = document.getElementById('pointer-p');
+    const pointerI = document.getElementById('pointer-i');
+
+    let barObjects = [];
+    let stepGenerator;
+    let currentAlgorithmState = null;
+    let isAutoPlaying = false;
+    let autoPlayIntervalId = null;
+    let animationSpeed = 700;
+
+    const BAR_WIDTH = 30;
+    const BAR_MARGIN = 10;
+    const TOTAL_BAR_SPACE = BAR_WIDTH + BAR_MARGIN;
+
+    speedSlider.addEventListener('input', (e) => {
+        animationSpeed = 2100 - parseInt(e.target.value);
+        if (isAutoPlaying) {
+            stopAutoPlay();
+            startAutoPlay();
+        }
+    });
+
+    function updateButtonStates(isAlgorithmActive) {
+        startBtn.textContent = isAlgorithmActive ? "重置" : "开始";
+        stepBtn.disabled = !isAlgorithmActive || isAutoPlaying;
+        autoBtn.disabled = !isAlgorithmActive;
+        arrayInput.disabled = isAlgorithmActive;
+        kInput.disabled = isAlgorithmActive;
+        autoBtn.textContent = isAutoPlaying ? "暂停" : "自动播放";
+    }
+
+    function displayBarsAndPointers(state) {
+        if (!state || !state.barsData) return;
+
+        const maxValue = Math.max(...state.barsData.map(b => b.value), 0) || 1;
+        const containerHeight = arrayContainer.clientHeight - 10 - 25;
+
+        state.barsData.forEach((barData, index) => {
+            let barObj = barObjects.find(b => b.id === barData.id);
+            if (!barObj) return;
+
+            barObj.value = barData.value;
+            barObj.elementWrapper.style.left = `${index * TOTAL_BAR_SPACE}px`;
+            barObj.barElement.style.height = `${Math.max(5, (barData.value / maxValue) * containerHeight)}px`;
+            barObj.valueLabelElement.textContent = barData.value;
+
+            barObj.barElement.classList.remove('pivot', 'current-i', 'current-p-marker', 'less-equal', 'final-kth', 'swapping');
+
+            if (state.pivotId === barData.id) barObj.barElement.classList.add('pivot');
+            if (state.iIdx === index) barObj.barElement.classList.add('current-i');
+            if (state.pIdx === index && state.action !== 'after_swap_pivot_p' && state.action !== 'found') {
+                if (state.pivotId !== barData.id || state.pIdx !== state.pivotActualIdx) {
+                    barObj.barElement.classList.add('current-p-marker');
+                }
+            }
+            if (state.finalKthId === barData.id) barObj.barElement.classList.add('final-kth');
+
+            if (state.action === 'before_swap' && (state.swapIds[0] === barData.id || state.swapIds[1] === barData.id)) {
+                barObj.barElement.classList.add('swapping');
+            }
+        });
+
+        // --- Pointer Logic ---
+        const activePointersInfo = [];
+        if (state.l !== -1 && state.l !== undefined && state.l < barObjects.length) activePointersInfo.push({ el: pointerL, index: state.l, name: 'L' });
+        if (state.r !== -1 && state.r !== undefined && state.r < barObjects.length) activePointersInfo.push({ el: pointerR, index: state.r, name: 'R' });
+        if (state.pIdx !== -1 && state.pIdx !== undefined && state.pIdx < barObjects.length) activePointersInfo.push({ el: pointerP, index: state.pIdx, name: 'P' });
+
+        const iPointerLogicalIndex = (state.iIdx === -1 || state.iIdx === undefined || state.iIdx >= state.r || state.iIdx >= barObjects.length) ? -1 : state.iIdx;
+        if (iPointerLogicalIndex !== -1) activePointersInfo.push({ el: pointerI, index: iPointerLogicalIndex, name: 'I' });
+
+        [pointerL, pointerR, pointerP, pointerI].forEach(p => p.style.display = 'none');
+
+        const pointersByTargetIndex = {};
+        activePointersInfo.forEach(pInfo => {
+            if (!pointersByTargetIndex[pInfo.index]) {
+                pointersByTargetIndex[pInfo.index] = [];
+            }
+            pointersByTargetIndex[pInfo.index].push(pInfo);
+        });
+
+        for (const indexStr in pointersByTargetIndex) {
+            const index = parseInt(indexStr);
+            const pointersAtThisIndex = pointersByTargetIndex[index];
+            pointersAtThisIndex.sort((a,b) => ['L','R','P','I'].indexOf(a.name) - ['L','R','P','I'].indexOf(b.name));
+
+            pointersAtThisIndex.forEach((pInfo, rank) => {
+                positionPointer(pInfo.el, index, rank, pointersAtThisIndex.length);
+            });
+        }
+        // --- End Pointer Logic ---
+
+        statusMessage.textContent = state.message;
+    }
+
+    function positionPointer(pointerElement, index, rank, totalAtThisIndex) {
+        // index is the logical index of the bar the pointer refers to.
+        // rank is the 0-based order of this pointer among others at the same bar.
+        // totalAtThisIndex is the count of pointers at this bar.
+
+        if (index === -1 || index === undefined || index >= barObjects.length ) {
+            pointerElement.style.display = 'none';
+            return;
+        }
+        pointerElement.style.display = 'flex';
+
+        const baseLeftForBarSlot = index * TOTAL_BAR_SPACE; // Left edge of the bar's allocated space
+        let offsetWithinBar;
+        const pointerVisualWidth = pointerElement.offsetWidth; // Actual width of the pointer content
+
+        if (totalAtThisIndex <= 1) {
+            // Center single pointer under the bar
+            offsetWithinBar = (BAR_WIDTH / 2) - (pointerVisualWidth / 2);
+        } else {
+            // Distribute multiple pointers under the bar
+            // Each pointer gets a "slot" within the BAR_WIDTH
+            const slotWidthForPointer = BAR_WIDTH / totalAtThisIndex;
+            // Calculate the center of this pointer's slot, then adjust by half its own width
+            offsetWithinBar = (rank * slotWidthForPointer) + (slotWidthForPointer / 2) - (pointerVisualWidth / 2);
+        }
+
+        pointerElement.style.left = `${baseLeftForBarSlot + offsetWithinBar}px`;
+    }
+
+
+    async function handleStep() {
+        if (!stepGenerator) return;
+
+        let { value: step, done } = stepGenerator.next(currentAlgorithmState ? currentAlgorithmState.barsData : undefined);
+        currentAlgorithmState = step;
+
+        if (done || !step) {
+            statusMessage.textContent = step ? step.message : "算法完成!";
+            if(step && step.finalKthId !== null) {
+                const finalBarObj = barObjects.find(b => b.id === step.finalKthId);
+                if(finalBarObj) finalBarObj.barElement.classList.add('final-kth');
+            }
+            stopAutoPlay();
+            updateButtonStates(false);
+            if (step) displayBarsAndPointers(step);
+            return false;
+        }
+
+        if (step.action === 'before_swap') {
+            displayBarsAndPointers(step);
+            await new Promise(resolve => setTimeout(resolve, animationSpeed / 2));
+        }
+
+        displayBarsAndPointers(step);
+
+        if (step.action === 'found') {
+            stopAutoPlay();
+            updateButtonStates(false);
+        }
+        return true;
+    }
+
+    function startAutoPlay() {
+        if (isAutoPlaying) return;
+        isAutoPlaying = true;
+        autoBtn.textContent = "暂停";
+        stepBtn.disabled = true;
+        autoPlayIntervalId = setInterval(async () => {
+            const hasMoreSteps = await handleStep();
+            if (!hasMoreSteps) {
+                stopAutoPlay();
+            }
+        }, animationSpeed);
+    }
+
+    function stopAutoPlay() {
+        if (!isAutoPlaying && autoPlayIntervalId === null) return;
+        isAutoPlaying = false;
+        clearInterval(autoPlayIntervalId);
+        autoPlayIntervalId = null;
+        const stillRunning = currentAlgorithmState && currentAlgorithmState.action !== 'found' && currentAlgorithmState.action !== 'error';
+        stepBtn.disabled = !stillRunning;
+        autoBtn.textContent = "自动播放";
+        if (!stillRunning) updateButtonStates(false);
+    }
+
+    function clearArrayContainer() {
+        const wrappers = arrayContainer.querySelectorAll('.bar-wrapper');
+        wrappers.forEach(wrapper => arrayContainer.removeChild(wrapper));
+    }
+
+    function initializeVisualization() {
+        stopAutoPlay();
+        clearArrayContainer();
+
+        const arrStr = arrayInput.value.split(',').map(s => s.trim()).filter(s => s !== "");
+        const nums = arrStr.map(Number).filter(n => !isNaN(n));
+
+        if (nums.length === 0) {
+            statusMessage.textContent = "请输入有效的数组。";
+            updateButtonStates(false); // Ensure buttons are reset if input is invalid
+            return;
+        }
+
+        let k = parseInt(kInput.value);
+        if (isNaN(k) || k < 1 || k > nums.length) {
+            statusMessage.textContent = `K 值必须在 1 到 ${nums.length} 之间。`;
+            updateButtonStates(false); // Ensure buttons are reset
+            return;
+        }
+
+        // Ensure pointers are visible for new visualization
+        [pointerL, pointerR, pointerP, pointerI].forEach(p => p.style.display = 'none');
+
+
+        barObjects = nums.map((val, idx) => {
+            const elementWrapper = document.createElement('div');
+            elementWrapper.className = 'bar-wrapper';
+
+            const barElement = document.createElement('div');
+            barElement.className = 'bar';
+
+            const valueLabelElement = document.createElement('div');
+            valueLabelElement.className = 'bar-value';
+            valueLabelElement.textContent = val;
+
+            elementWrapper.appendChild(barElement);
+            elementWrapper.appendChild(valueLabelElement);
+            arrayContainer.appendChild(elementWrapper);
+
+            return { id: idx, value: val, elementWrapper, barElement, valueLabelElement };
+        });
+
+        const maxValue = Math.max(...nums, 0) || 1;
+        const containerHeight = arrayContainer.clientHeight - 10 - 25;
+        barObjects.forEach((barObj, index) => {
+            barObj.elementWrapper.style.left = `${index * TOTAL_BAR_SPACE}px`;
+            barObj.barElement.style.height = `${Math.max(5, (barObj.value / maxValue) * containerHeight)}px`;
+        });
+
+        const kTarget = nums.length - k;
+        const initialBarsData = nums.map((val, idx) => ({ id: idx, value: val }));
+
+        stepGenerator = quickSelectStepGenerator(initialBarsData, 0, nums.length - 1, kTarget, k);
+        currentAlgorithmState = null;
+        handleStep();
+        updateButtonStates(true);
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (startBtn.textContent === "重置") {
+            stopAutoPlay();
+            stepGenerator = null;
+            currentAlgorithmState = null;
+            barObjects = [];
+            clearArrayContainer();
+
+            pointerL.style.display = 'none';
+            pointerR.style.display = 'none';
+            pointerP.style.display = 'none';
+            pointerI.style.display = 'none';
+
+            statusMessage.textContent = "请输入数组和K值，然后点击开始。";
+            updateButtonStates(false);
+        } else {
+            initializeVisualization();
+        }
+    });
+
+    stepBtn.addEventListener('click', () => {
+        if (isAutoPlaying) stopAutoPlay();
+        handleStep();
+    });
+
+    autoBtn.addEventListener('click', () => {
+        if (isAutoPlaying) {
+            stopAutoPlay();
+        } else {
+            startAutoPlay();
+        }
+    });
+
+    function* quickSelectStepGenerator(initialBarsData, l, r, kTargetIndex, originalK) {
+        let barsData = JSON.parse(JSON.stringify(initialBarsData));
+
+        if (l > r) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `错误: l (${l}) > r (${r})`, action: 'error', pivotId: null, pIdx: -1, iIdx: -1, finalKthId: null, pivotActualIdx: -1 };
+            return null;
+        }
+
+        yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `开始 QuickSelect 范围 [${l}, ${r}]。寻找第 ${originalK} 大 (即第 ${kTargetIndex+1} 小) 的元素。`, action: 'start_partition', pivotId: null, pIdx: l, iIdx: l, finalKthId: null, pivotActualIdx: -1 };
+
+        let pivotId = barsData[r].id;
+        let pivotValue = barsData[r].value;
+
+        yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `选择 ${pivotValue} (ID: ${pivotId}, 索引 ${r}) 作为基准 (pivot)。P 指针初始化为 ${l}。`, action: 'pivot_selected', pivotId, pIdx: l, iIdx: l, finalKthId: null, pivotActualIdx: r };
+
+        let p = l;
+
+        for (let i = l; i < r; i++) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `比较 nums[${i}] (${barsData[i].value}, ID: ${barsData[i].id}) 与基准 ${pivotValue} (ID: ${pivotId})`, action: 'compare', pivotId, pIdx: p, iIdx: i, finalKthId: null, pivotActualIdx: barsData.findIndex(b=>b.id === pivotId) };
+
+            if (barsData[i].value <= pivotValue) {
+                if (i !== p) {
+                    yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `nums[${i}] (${barsData[i].value}) <= ${pivotValue}。准备交换 nums[${i}] (ID ${barsData[i].id}) 与 nums[${p}] (${barsData[p].value}, ID ${barsData[p].id})。`, action: 'before_swap', swapIds: [barsData[i].id, barsData[p].id], pivotId, pIdx: p, iIdx: i, finalKthId: null, pivotActualIdx: barsData.findIndex(b=>b.id === pivotId) };
+
+                    [barsData[i], barsData[p]] = [barsData[p], barsData[i]];
+
+                    yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `交换完成。P 指向下一个位置。`, action: 'after_swap_i_p', pivotId, pIdx: p, iIdx: i, finalKthId: null, pivotActualIdx: barsData.findIndex(b=>b.id === pivotId) };
+                } else {
+                    yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `nums[${i}] (${barsData[i].value}) <= ${pivotValue}。 i (${i}) 和 p (${p}) 相同，无需交换。P 指向下一个位置。`, action: 'no_swap_i_equals_p', pivotId, pIdx: p, iIdx: i, finalKthId: null, pivotActualIdx: barsData.findIndex(b=>b.id === pivotId) };
+                }
+                p++;
+            } else {
+                yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `nums[${i}] (${barsData[i].value}) > ${pivotValue}。不交换。`, action: 'no_swap', pivotId, pIdx: p, iIdx: i, finalKthId: null, pivotActualIdx: barsData.findIndex(b=>b.id === pivotId) };
+            }
+        }
+
+        let currentPivotVisualIndex = barsData.findIndex(b => b.id === pivotId);
+        let finalPivotVisualIndex = p;
+
+        if (currentPivotVisualIndex === -1) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `错误: 找不到Pivot (ID: ${pivotId})`, action: 'error', pivotId, pIdx: p, iIdx: r -1, finalKthId: null, pivotActualIdx: -1 };
+            return null;
+        }
+
+        if (currentPivotVisualIndex !== finalPivotVisualIndex) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `遍历完成。准备交换基准 (现位于 ${currentPivotVisualIndex}, ID ${pivotId}, 值 ${barsData[currentPivotVisualIndex].value}) 与 nums[${finalPivotVisualIndex}] (ID ${barsData[finalPivotVisualIndex].id}, 值 ${barsData[finalPivotVisualIndex].value})。`, action: 'before_swap', swapIds: [barsData[currentPivotVisualIndex].id, barsData[finalPivotVisualIndex].id], pivotId, pIdx: finalPivotVisualIndex, iIdx: r -1 , finalKthId: null, pivotActualIdx: currentPivotVisualIndex };
+
+            [barsData[currentPivotVisualIndex], barsData[finalPivotVisualIndex]] = [barsData[finalPivotVisualIndex], barsData[currentPivotVisualIndex]];
+
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `交换完成。基准现在位于索引 ${finalPivotVisualIndex}。`, action: 'after_swap_pivot_p', pivotId, pIdx: finalPivotVisualIndex, iIdx: r-1 , finalKthId: null, pivotActualIdx: finalPivotVisualIndex };
+        } else {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `遍历完成。基准 (ID ${pivotId}) 已在正确位置 (索引 ${finalPivotVisualIndex})，无需交换。`, action: 'no_swap_pivot_in_place', pivotId, pIdx: finalPivotVisualIndex, iIdx: r-1 , finalKthId: null, pivotActualIdx: finalPivotVisualIndex };
+        }
+
+        if (finalPivotVisualIndex === kTargetIndex) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `p (${finalPivotVisualIndex}) == kTarget (${kTargetIndex})。找到第 ${originalK} 大的元素: ${barsData[finalPivotVisualIndex].value} (ID ${barsData[finalPivotVisualIndex].id})。`, action: 'found', pivotId, pIdx: finalPivotVisualIndex, iIdx: -1, finalKthId: barsData[finalPivotVisualIndex].id, pivotActualIdx: finalPivotVisualIndex };
+            return barsData[finalPivotVisualIndex];
+        } else if (finalPivotVisualIndex < kTargetIndex) {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `p (${finalPivotVisualIndex}) < kTarget (${kTargetIndex})。在右半部分 [${finalPivotVisualIndex + 1}, ${r}] 查找。`, action: 'recurse_right', pivotId: null, pIdx: -1, iIdx: -1, finalKthId: null, pivotActualIdx: -1 };
+            yield* quickSelectStepGenerator(barsData, finalPivotVisualIndex + 1, r, kTargetIndex, originalK);
+        } else {
+            yield { barsData, l, r, kTarget: kTargetIndex, originalK, message: `p (${finalPivotVisualIndex}) > kTarget (${kTargetIndex})。在左半部分 [${l}, ${finalPivotVisualIndex - 1}] 查找。`, action: 'recurse_left', pivotId: null, pIdx: -1, iIdx: -1, finalKthId: null, pivotActualIdx: -1 };
+            yield* quickSelectStepGenerator(barsData, l, finalPivotVisualIndex - 1, kTargetIndex, originalK);
+        }
+    }
+    updateButtonStates(false);
+    animationSpeed = 2100 - parseInt(speedSlider.value);
+
+</script>
+</body>
+</html>
