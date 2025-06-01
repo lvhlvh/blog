@@ -22,3 +22,6 @@
 ## 栈
 * [LC.394.字符串解码](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.394.decode-string.html)
 * [LC.215.数组中的第K个最大元素](https://lvhlvh.github.io/blog/static/leetcode/problem/lc.215.kth-largest-element-in-an-array.html)
+
+## 分布式系统
+* [分布式id脑图](https://lvhlvh.github.io/blog/static/notes/distributedsystem/分布式ID脑图.svg)
