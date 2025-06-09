@@ -29,3 +29,4 @@
 ## Java并发
 * [Java并发底层硬件原理探究](https://lvhlvh.github.io/blog/static/notes/java/concurrency/Java并发底层硬件原理探究.pdf)
 * [JMM深度解析](https://lvhlvh.github.io/blog/static/notes/java/concurrency/JMM深度解析.pdf)
+* [面试答题版AQS脑图](https://lvhlvh.github.io/blog/static/notes/java/concurrency/面试答题版AQS脑图.pdf)
