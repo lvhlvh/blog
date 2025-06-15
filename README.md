@@ -39,3 +39,6 @@
 * [面试答题版AQS脑图](https://lvhlvh.github.io/blog/static/notes/java/concurrency/面试答题版AQS脑图.pdf)
 * [面试答题版CompletableFuture脑图](https://lvhlvh.github.io/blog/static/notes/java/concurrency/面试答题版CompletableFuture脑图.pdf)
 * [面试答题版Java线程池脑图](https://lvhlvh.github.io/blog/static/notes/java/concurrency/面试答题版Java线程池脑图.pdf)
+
+## Redis
+* [Redis主从复制版本演进史](https://lvhlvh.github.io/blog/static/notes/redis/Redis主从复制演进史.html)
