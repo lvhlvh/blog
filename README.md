@@ -41,4 +41,5 @@
 * [面试答题版Java线程池脑图](https://lvhlvh.github.io/blog/static/notes/java/concurrency/面试答题版Java线程池脑图.pdf)
 
 ## Redis
+* [Redis知识体系](https://lvhlvh.github.io/blog/static/notes/redis/Redis知识体系.pdf)
 * [Redis主从复制版本演进史](https://lvhlvh.github.io/blog/static/notes/redis/Redis主从复制演进史.html)
