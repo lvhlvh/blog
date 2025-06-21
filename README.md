@@ -30,7 +30,7 @@
 
 ## 分布式系统
 
-* [分布式id脑图](https://lvhlvh.github.io/blog/static/notes/distributedsystem/分布式ID脑图.svg)
+* [分布式id脑图](https://lvhlvh.github.io/blog/static/notes/distributedsystem/分布式ID脑图.pdf)
 
 ## Java并发
 
